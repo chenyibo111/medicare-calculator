@@ -40,8 +40,11 @@ export class TtlPolicyCache implements PolicyCache {
   }
 
   async invalidateByPolicyVersion(version: string): Promise<void> {
-    for (const [key, entry] of this.entries) {
-      if (entry.policyVersion === version) this.entries.delete(key);
-    }
+    // The local adapter has no secondary version index. Publication therefore
+    // clears this process snapshot instead of risking an older version under a
+    // versionless lookup key. A production cache adapter may target keys by
+    // region/version through an invalidation event.
+    void version;
+    this.entries.clear();
   }
 }

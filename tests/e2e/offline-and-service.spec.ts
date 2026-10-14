@@ -50,7 +50,8 @@ test.describe("服务版 @service", () => {
     await page.route("**/api/v1/reimbursement-calculations", (route) => route.fulfill({ status: 400, contentType: "application/json", body: JSON.stringify({ message: "总医疗费用必须是非负整数分" }) }));
     await page.getByRole("button", { name: "开始测算" }).click();
 
-    await expect(page.getByTestId("service-error")).toHaveText("总医疗费用必须是非负整数分");
+    await expect(page.getByTestId("totalAmount-error")).toHaveText("总医疗费用必须是非负整数分");
     await expect(page.getByLabel("总医疗费用（元）")).toHaveValue("60000");
+    await expect(page.getByLabel("总医疗费用（元）")).toBeFocused();
   });
 });

@@ -18,6 +18,7 @@ export interface PendingPolicyDraft {
 
 export interface ApprovedPolicyDraft extends Omit<PendingPolicyDraft, "status"> {
   readonly status: "approved";
+  readonly approvalId: string;
   readonly reviewer: string;
   readonly approvedAt: string;
 }
@@ -29,14 +30,18 @@ export interface PublishedPolicyDraft extends Omit<ApprovedPolicyDraft, "status"
 
 export interface PolicySourceConnector { fetch(sourceConfig: string): Promise<RawPolicySource>; }
 export interface PolicyExtractionAdapter { propose(rawSource: RawPolicySource): Promise<PendingPolicyDraft>; }
-export interface PolicyReviewGateway { approve(draft: PendingPolicyDraft, reviewer: string): Promise<ApprovedPolicyDraft>; }
+export interface PolicyReviewGateway {
+  approve(draft: PendingPolicyDraft, reviewer: string): Promise<ApprovedPolicyDraft>;
+  verifyApproved(draft: ApprovedPolicyDraft): Promise<void>;
+}
 export interface PublishedPolicyStore { savePublished(policy: PublishedPolicy & { readonly status: "published" }): Promise<void>; }
 
 export class PolicyPublisher {
-  constructor(private readonly dependencies: { readonly store: PublishedPolicyStore; readonly cache: PolicyCache }) {}
+  constructor(private readonly dependencies: { readonly store: PublishedPolicyStore; readonly cache: PolicyCache; readonly reviewGateway: PolicyReviewGateway }) {}
 
   async publish(draft: PendingPolicyDraft | ApprovedPolicyDraft): Promise<PublishedPolicyDraft> {
     if (draft.status !== "approved") throw new Error("审核通过后才能发布政策");
+    await this.dependencies.reviewGateway.verifyApproved(draft);
     await this.dependencies.store.savePublished({ ...draft.policy, status: "published" });
     await this.dependencies.cache.invalidateByPolicyVersion(draft.policy.version);
     return { ...draft, status: "published", publishedAt: new Date().toISOString() };

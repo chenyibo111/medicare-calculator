@@ -71,11 +71,11 @@ describe("TtlPolicyCache", () => {
     });
     expect(loads).toBe(2);
 
-    await cache.invalidateByPolicyVersion("T-2026.01");
+    await cache.invalidateByPolicyVersion("T-2026.02");
     await expect(cache.getOrLoad("测试城市:居民医保:2026-10-14", async () => {
       loads += 1;
-      return loadV1();
-    })).resolves.toMatchObject({ status: "miss" });
+      return { version: "T-2026.02" };
+    })).resolves.toMatchObject({ status: "miss", value: { version: "T-2026.02" } });
     expect(loads).toBe(3);
   });
 });

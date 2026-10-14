@@ -14,7 +14,8 @@ const draft = await new DemoExtractionAdapter().propose(source);
 const draftDirectory = resolve(root, "data/policy-drafts");
 await mkdir(draftDirectory, { recursive: true });
 await writeFile(resolve(draftDirectory, `${draft.id}.json`), `${JSON.stringify(draft, null, 2)}\n`, "utf8");
-const approved = await new LocalReviewGateway().approve(draft, "demo-policy-reviewer");
-const published = await new PolicyPublisher({ store: new LocalPolicyPublicationStore(resolve(root, "data/published-policies")), cache: new TtlPolicyCache({ ttlMs: 60_000 }) }).publish(approved);
+const reviewGateway = new LocalReviewGateway();
+const approved = await reviewGateway.approve(draft, "demo-policy-reviewer");
+const published = await new PolicyPublisher({ store: new LocalPolicyPublicationStore(resolve(root, "data/published-policies")), cache: new TtlPolicyCache({ ttlMs: 60_000 }), reviewGateway }).publish(approved);
 
 console.log(JSON.stringify({ source: source.sourceUrl, draft: draft.id, demoAIProposal: draft.demoAIProposal, reviewer: approved.reviewer, publishedVersion: published.policy.version, cacheInvalidated: true }, null, 2));

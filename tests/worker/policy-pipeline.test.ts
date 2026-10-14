@@ -56,18 +56,21 @@ describe("offline policy pipeline", () => {
     const draft = await new DemoExtractionAdapter().propose(source);
     const saved: unknown[] = [];
     const invalidated: string[] = [];
+    const reviewGateway = new LocalReviewGateway();
     const publisher = new PolicyPublisher({
       store: { async savePublished(policy) { saved.push(policy); } },
       cache: {
         async getOrLoad() { throw new Error("not used in publishing"); },
         async invalidateByPolicyVersion(version) { invalidated.push(version); },
       },
+      reviewGateway,
     });
 
     await expect(publisher.publish(draft)).rejects.toThrow("审核通过后才能发布政策");
-    await expect(new LocalReviewGateway().approve(draft, "")).rejects.toThrow("审核人不能为空");
+    await expect(reviewGateway.approve(draft, "")).rejects.toThrow("审核人不能为空");
 
-    const approved = await new LocalReviewGateway().approve(draft, "policy-reviewer");
+    const approved = await reviewGateway.approve(draft, "policy-reviewer");
+    await expect(publisher.publish({ ...approved, approvalId: "forged" })).rejects.toThrow("审核凭证无效");
     const published = await publisher.publish(approved);
 
     expect(published.status).toBe("published");

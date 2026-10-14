@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatFen, yuanToFen } from "../../packages/domain/src/money.js";
+import { formatFen, multiplyByBps, yuanToFen } from "../../packages/domain/src/money.js";
 import { ReimbursementEngine } from "../../packages/domain/src/reimbursement-engine.js";
 
 const cityA = {
@@ -46,6 +46,10 @@ describe("money helpers", () => {
   it("converts decimal yuan strings to integer fen without floating-point drift", () => {
     expect(yuanToFen("123.45")).toBe(12_345);
     expect(formatFen(12_345)).toBe("¥123.45");
+  });
+
+  it("uses exact integer arithmetic for safe-integer amounts and basis points", () => {
+    expect(multiplyByBps(9_007_199_254_660_991, 8_000)).toBe(7_205_759_403_728_792);
   });
 });
 
