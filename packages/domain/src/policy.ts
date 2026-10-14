@@ -16,6 +16,7 @@ export interface PublishedPolicy {
   readonly benefitPlan: "职工医保" | "居民医保";
   readonly version: string;
   readonly effectiveFrom: string;
+  readonly effectiveTo?: string;
   readonly sourceReference: string;
   readonly hospitalRules: Readonly<Record<HospitalLevel, HospitalRule>>;
   readonly classBAdvanceRateBps: number;

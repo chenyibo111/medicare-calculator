@@ -46,7 +46,7 @@ describe("offline policy pipeline", () => {
     expect(draft.policy.version).toBe("T-2026.02");
   });
 
-  it("refuses direct publication and publishes only an approved version with cache invalidation", async () => {
+  it("refuses direct publication and writes an Outbox event only with an approved version", async () => {
     const source = {
       sourceId: "source-1",
       region: "测试城市",
@@ -55,13 +55,14 @@ describe("offline policy pipeline", () => {
     };
     const draft = await new DemoExtractionAdapter().propose(source);
     const saved: unknown[] = [];
-    const invalidated: string[] = [];
+    const outboxEvents: string[] = [];
     const reviewGateway = new LocalReviewGateway();
     const publisher = new PolicyPublisher({
-      store: { async savePublished(policy) { saved.push(policy); } },
-      cache: {
-        async getOrLoad() { throw new Error("not used in publishing"); },
-        async invalidateByPolicyVersion(version) { invalidated.push(version); },
+      store: {
+        async publishApprovedVersion({ publication }) {
+          saved.push(publication.policy);
+          outboxEvents.push(publication.event.eventType);
+        },
       },
       reviewGateway,
     });
@@ -76,6 +77,6 @@ describe("offline policy pipeline", () => {
     expect(published.status).toBe("published");
     expect(published.policy.version).toBe("T-2026.02");
     expect(saved).toHaveLength(1);
-    expect(invalidated).toEqual(["T-2026.02"]);
+    expect(outboxEvents).toEqual(["policy.published"]);
   });
 });
