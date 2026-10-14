@@ -1,12 +1,12 @@
 import { CalculationApplicationError } from "../../../../../../packages/application/src/calculate-reimbursement";
-import { calculationUseCase } from "../../../../server/composition-root";
+import { getCalculationUseCase } from "../../../../server/composition-root";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request): Promise<Response> {
   try {
     const body = await request.json();
-    const response = await calculationUseCase.execute(body, {
+    const response = await (await getCalculationUseCase()).execute(body, {
       requestId: request.headers.get("x-request-id") ?? undefined,
     });
     return Response.json(response);

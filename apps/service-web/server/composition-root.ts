@@ -1,14 +1,27 @@
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import { CalculateReimbursementUseCase } from "../../../packages/application/src/calculate-reimbursement";
-import { FilePolicyRepository } from "../../../packages/infrastructure/src/file-policy-repository";
-import { InMemoryAuditLog } from "../../../packages/infrastructure/src/in-memory-audit-log";
-import { TtlPolicyCache } from "../../../packages/infrastructure/src/ttl-policy-cache";
+import { CalculateReimbursementUseCase } from "../../../packages/application/src/calculate-reimbursement.js";
+import { PostgresAuditLog, PostgresPolicyRepository, RedisPolicyCache, createPostgresSqlExecutor } from "../../../packages/infrastructure/src/index.js";
+import { resolveRuntimeConfig } from "./runtime-config.js";
+import { createTestCalculationUseCase } from "./test-composition-root.js";
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
-const repository = new FilePolicyRepository(resolve(root, "data/published-policies"));
-const cache = new TtlPolicyCache({ ttlMs: 5 * 60_000 });
-const auditLog = new InMemoryAuditLog();
+let calculationUseCasePromise: Promise<CalculateReimbursementUseCase> | undefined;
 
-export const calculationUseCase = new CalculateReimbursementUseCase({ repository, cache, auditLog });
-export { repository };
+async function createCalculationUseCase(): Promise<CalculateReimbursementUseCase> {
+  const config = resolveRuntimeConfig(process.env);
+  if (config.mode === "test") return createTestCalculationUseCase();
+
+  const database = createPostgresSqlExecutor(config.databaseUrl);
+  try {
+    await database.query("SELECT 1");
+    const cache = await RedisPolicyCache.connect(config.redisUrl);
+    return new CalculateReimbursementUseCase({ repository: new PostgresPolicyRepository(database), cache, auditLog: new PostgresAuditLog(database) });
+  } catch (error) {
+    await database.close();
+    const message = error instanceof Error ? error.message : "未知错误";
+    throw new Error(`生产依赖不可用，请先运行 docker compose up：${message}`);
+  }
+}
+
+export function getCalculationUseCase(): Promise<CalculateReimbursementUseCase> {
+  calculationUseCasePromise ??= createCalculationUseCase();
+  return calculationUseCasePromise;
+}
