@@ -1,0 +1,55 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-medicare_demo}
+      POSTGRES_USER: ${POSTGRES_USER:-medicare_app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?请先复制 .env.example 为 .env 并设置 POSTGRES_PASSWORD}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - medicare_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - medicare_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  service-web:
+    build:
+      context: .
+      dockerfile: apps/service-web/Dockerfile
+    restart: unless-stopped
+    environment:
+      MEDICARE_RUNTIME: compose
+      DATABASE_URL: postgres://${POSTGRES_USER:-medicare_app}:${POSTGRES_PASSWORD:?请先复制 .env.example 为 .env 并设置 POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-medicare_demo}
+      REDIS_URL: redis://redis:6379
+      PORT: 3000
+    ports:
+      - "${SERVICE_WEB_PORT:-3010}:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  medicare_postgres_data:
+  medicare_redis_data:

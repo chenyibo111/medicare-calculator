@@ -1,0 +1,10 @@
+.git
+.superpowers
+node_modules
+.next
+apps/offline-demo/dist
+playwright-report
+test-results
+output
+.env
+*.log

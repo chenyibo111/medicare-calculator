@@ -1,5 +1,6 @@
 node_modules/
 .superpowers/
+.env
 .next/
 apps/offline-demo/dist/
 data/policy-drafts/*.json

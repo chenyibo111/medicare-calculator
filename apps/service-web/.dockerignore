@@ -1,0 +1,1 @@
+# Docker build uses the repository root as context; exclusions live in ../../.dockerignore.
