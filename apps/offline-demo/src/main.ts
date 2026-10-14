@@ -3,6 +3,8 @@ import { ReimbursementEngine } from "../../../packages/domain/src/reimbursement-
 import type { EmploymentStatus, HospitalLevel, ValidatedCalculationInput } from "../../../packages/domain/src/policy";
 import { offlinePolicies } from "./policy-snapshot";
 
+declare global { interface Window { medicareOfflineAction?: (action: "calculator" | "architecture" | keyof typeof samples) => void; } }
+
 const engine = new ReimbursementEngine();
 const form = document.querySelector<HTMLFormElement>("#calculator-form")!;
 const region = document.querySelector<HTMLSelectElement>("#region")!;
@@ -73,8 +75,6 @@ function activateTab(target: "calculator" | "architecture") {
   document.querySelector<HTMLElement>("#calculator-panel")!.hidden = !calculator; document.querySelector<HTMLElement>("#architecture-panel")!.hidden = calculator;
 }
 region.addEventListener("change", setEmploymentOptions);
-document.querySelectorAll<HTMLButtonElement>("[data-sample]").forEach((button) => button.addEventListener("click", () => fillSample(button.dataset.sample as keyof typeof samples)));
-document.querySelector<HTMLButtonElement>("#calculator-tab")!.addEventListener("click", () => activateTab("calculator"));
-document.querySelector<HTMLButtonElement>("#architecture-tab")!.addEventListener("click", () => activateTab("architecture"));
+window.medicareOfflineAction = (action) => { if (action === "calculator" || action === "architecture") activateTab(action); else fillSample(action); };
 form.addEventListener("submit", (event) => { event.preventDefault(); const request = toRequest(); if (request) renderResult(request); });
 setEmploymentOptions(); fillSample("city-a");

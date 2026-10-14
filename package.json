@@ -19,7 +19,7 @@
     "dev:service": "pnpm --filter @medicare/service-web dev",
     "build:service": "pnpm --filter @medicare/service-web build",
     "worker:demo": "tsx worker/src/run-policy-pipeline.ts",
-    "verify": "npm run typecheck && npm test && npm run build:offline && npm run test:e2e"
+    "verify": "pnpm run typecheck && pnpm test && pnpm run build:offline && pnpm run build:service && pnpm run test:e2e"
   },
   "devDependencies": {
     "@playwright/test": "1.55.0",

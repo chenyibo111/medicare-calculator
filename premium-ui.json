@@ -1,0 +1,7 @@
+{
+  "sourceRoots": ["apps/offline-demo/src", "apps/service-web"],
+  "locale": "zh-CN",
+  "ownership": {
+    "Select/Listbox": "native"
+  }
+}

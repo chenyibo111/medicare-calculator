@@ -22,8 +22,8 @@
       </header>
 
       <div class="mode-tabs" role="tablist" aria-label="页面视图">
-        <button id="calculator-tab" type="button" role="tab" aria-selected="true" aria-controls="calculator-panel">报销测算</button>
-        <button id="architecture-tab" type="button" role="tab" aria-selected="false" aria-controls="architecture-panel" tabindex="-1">方案设计</button>
+        <button id="calculator-tab" type="button" role="tab" aria-selected="true" aria-controls="calculator-panel" onclick="window.medicareOfflineAction?.('calculator')">报销测算</button>
+        <button id="architecture-tab" type="button" role="tab" aria-selected="false" aria-controls="architecture-panel" tabindex="-1" onclick="window.medicareOfflineAction?.('architecture')">方案设计</button>
       </div>
 
       <section id="calculator-panel" role="tabpanel" aria-labelledby="calculator-tab">
@@ -36,8 +36,8 @@
             </div>
             <div class="sample-row" aria-label="一键填充样例">
               <span>快速体验</span>
-              <button type="button" class="sample-button" data-testid="sample-city-a" data-sample="city-a">填入城市 A 样例</button>
-              <button type="button" class="sample-button" data-testid="sample-city-b" data-sample="city-b">填入城市 B 样例</button>
+              <button type="button" class="sample-button" data-testid="sample-city-a" data-sample="city-a" onclick="window.medicareOfflineAction?.('city-a')">填入城市 A 样例</button>
+              <button type="button" class="sample-button" data-testid="sample-city-b" data-sample="city-b" onclick="window.medicareOfflineAction?.('city-b')">填入城市 B 样例</button>
             </div>
             <div class="field-grid">
               <div class="field"><label for="region">参保城市</label><select id="region" name="region"><option value="城市A">城市 A · 职工医保</option><option value="城市B">城市 B · 居民医保</option></select></div>
