@@ -2,6 +2,8 @@ node_modules/
 .superpowers/
 .next/
 apps/offline-demo/dist/
+data/policy-drafts/*.json
+data/published-policies/*-demo.json
 playwright-report/
 test-results/
 *.log

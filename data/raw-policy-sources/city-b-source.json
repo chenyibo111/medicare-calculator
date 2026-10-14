@@ -1,0 +1,6 @@
+{
+  "sourceId": "city-b-notice-2026-02",
+  "region": "城市B",
+  "sourceUrl": "https://example.test/city-b/2026-02",
+  "proposedPolicy": { "region": "城市B", "benefitPlan": "居民医保", "version": "B-2026.02-demo", "effectiveFrom": "2026-02-01", "sourceReference": "示例城市 B 医保政策更新通知", "hospitalRules": { "community": { "deductibleFen": 10000, "reimbursementRateBps": 8500 }, "secondary": { "deductibleFen": 30000, "reimbursementRateBps": 7500 }, "tertiary": { "deductibleFen": 60000, "reimbursementRateBps": 6500 } }, "classBAdvanceRateBps": 1500, "annualCapFen": 20000000, "retirementBonusBps": 0, "unfiledOutOfAreaReductionBps": 1500, "catastrophicTiers": [] }
+}
