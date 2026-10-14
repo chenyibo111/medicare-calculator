@@ -6,4 +6,5 @@ data/policy-drafts/*.json
 data/published-policies/*-demo.json
 playwright-report/
 test-results/
+output/
 *.log

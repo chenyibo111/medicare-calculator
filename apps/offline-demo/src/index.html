@@ -3,12 +3,74 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>医保报销计算器 MVP</title>
+    <meta name="description" content="医保报销计算器离线演示版" />
+    <title>医保报销计算器 — 离线演示</title>
+    <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <main>
-      <h1>医保报销计算器</h1>
-      <p>示例政策，仅供演示。</p>
+    <main class="app-shell">
+      <header class="masthead">
+        <div>
+          <p class="eyebrow">企业 AI 实践 · 离线演示版</p>
+          <h1>医保报销计算器</h1>
+          <p class="lede">用一张可核查的结算单，演示规则计算与政策治理边界。</p>
+        </div>
+        <aside class="policy-notice" aria-label="政策免责声明">
+          <strong>示例政策，仅供演示</strong>
+          <span>仅含城市 A / B 的住院样例，不连接实时政策或结算系统。</span>
+        </aside>
+      </header>
+
+      <div class="mode-tabs" role="tablist" aria-label="页面视图">
+        <button id="calculator-tab" type="button" role="tab" aria-selected="true" aria-controls="calculator-panel">报销测算</button>
+        <button id="architecture-tab" type="button" role="tab" aria-selected="false" aria-controls="architecture-panel" tabindex="-1">方案设计</button>
+      </div>
+
+      <section id="calculator-panel" role="tabpanel" aria-labelledby="calculator-tab">
+        <div class="calculator-grid">
+          <form id="calculator-form" class="form-card" novalidate>
+            <div class="section-heading">
+              <p class="step-label">输入条件</p>
+              <h2>住院费用测算</h2>
+              <p>金额以元填写；最终计算在本地按整数分完成。</p>
+            </div>
+            <div class="sample-row" aria-label="一键填充样例">
+              <span>快速体验</span>
+              <button type="button" class="sample-button" data-testid="sample-city-a" data-sample="city-a">填入城市 A 样例</button>
+              <button type="button" class="sample-button" data-testid="sample-city-b" data-sample="city-b">填入城市 B 样例</button>
+            </div>
+            <div class="field-grid">
+              <div class="field"><label for="region">参保城市</label><select id="region" name="region"><option value="城市A">城市 A · 职工医保</option><option value="城市B">城市 B · 居民医保</option></select></div>
+              <div class="field"><label for="employmentStatus">参保身份</label><select id="employmentStatus" name="employmentStatus"></select><p id="employmentStatus-help" class="field-help">身份影响适用规则；城市 B 仅提供居民医保样例。</p></div>
+              <div class="field"><label for="hospitalLevel">医院等级</label><select id="hospitalLevel" name="hospitalLevel"><option value="community">社区医院</option><option value="secondary">二级医院</option><option value="tertiary" selected>三级医院</option></select></div>
+              <div class="field checkbox-field"><label for="outOfAreaFiled"><input id="outOfAreaFiled" name="outOfAreaFiled" type="checkbox" checked />异地就医已备案</label><p class="field-help">未备案将按示例规则下调报销比例。</p></div>
+              <div class="field"><label for="totalAmount">总医疗费用（元）</label><input id="totalAmount" name="totalAmount" inputmode="decimal" autocomplete="off" placeholder="例如 100000" aria-describedby="totalAmount-error" /><p id="totalAmount-error" class="field-error" data-testid="totalAmount-error"></p></div>
+              <div class="field"><label for="outOfCatalogAmount">目录外费用（元）</label><input id="outOfCatalogAmount" name="outOfCatalogAmount" inputmode="decimal" autocomplete="off" placeholder="例如 5000" aria-describedby="outOfCatalogAmount-error" /><p id="outOfCatalogAmount-error" class="field-error"></p></div>
+              <div class="field"><label for="classBAmount">乙类费用（元）</label><input id="classBAmount" name="classBAmount" inputmode="decimal" autocomplete="off" placeholder="例如 10000" aria-describedby="classBAmount-error" /><p id="classBAmount-error" class="field-error"></p></div>
+              <div class="field"><label for="annualReimbursedAmount">本年度已报销（元）</label><input id="annualReimbursedAmount" name="annualReimbursedAmount" inputmode="decimal" autocomplete="off" value="0" aria-describedby="annualReimbursedAmount-error" /><p id="annualReimbursedAmount-error" class="field-error"></p></div>
+            </div>
+            <div class="form-footer"><p id="form-status" class="form-status" role="status" aria-live="polite"></p><button class="primary-button" type="submit">开始测算</button></div>
+          </form>
+          <section class="result-card" aria-labelledby="result-title">
+            <div class="section-heading"><p class="step-label">本地规则引擎</p><h2 id="result-title">预计结算结果</h2><p id="result-placeholder">填入条件后生成一张可核查的结算单。</p></div>
+            <div id="result-content" hidden>
+              <div class="settlement-strip"><div><p>预计自费</p><output id="estimated-self-pay" data-testid="estimated-self-pay" class="big-money"></output></div><dl><div><dt>政策版本</dt><dd id="policy-version"></dd></div><div><dt>运行模式</dt><dd>离线快照</dd></div></dl></div>
+              <dl class="amount-grid"><div><dt>总医疗费用</dt><dd id="total-amount-output"></dd></div><div><dt>基本医保报销</dt><dd id="basic-reimbursement"></dd></div><div><dt>大病保险报销</dt><dd id="catastrophic-reimbursement"></dd></div></dl>
+              <details class="trace-details" open><summary>计算明细 <span>逐项核查</span></summary><ol id="trace-list"></ol></details>
+            </div>
+          </section>
+        </div>
+      </section>
+      <section id="architecture-panel" role="tabpanel" aria-labelledby="architecture-tab" hidden>
+        <div class="architecture-intro"><p class="step-label">评测重点</p><h2>两种交付模式，一条可演进的后端链路</h2><p>离线版用于立即演示交互与规则可解释性；服务版保留政策获取、审核发布、缓存和 API 的替换入口。</p></div>
+        <div class="architecture-grid">
+          <article class="architecture-card"><p class="card-kicker">离线 Demo</p><h3>浏览器本地测算</h3><p>静态政策快照 + 共享规则引擎 → 本地结算单。无网络请求，不表示实时政策。</p></article>
+          <article class="architecture-card featured"><p class="card-kicker">服务版</p><h3>API 统一执行业务规则</h3><p>页面 → 计算 API → 用例层 → 政策仓库 / TTL 缓存 → 审计记录。浏览器不导入政策比例，也不复制公式。</p></article>
+          <article class="architecture-card"><p class="card-kicker">政策治理</p><h3>AI 只生成待审核草稿</h3><p>原始政策 → AI/OCR 提案 → 人工审核 → 版本化发布 → 缓存失效。AI 不可直接发布，不可决定报销结果。</p></article>
+        </div>
+        <div class="replacement-note"><strong>MVP → 生产替换点：</strong>本地 JSON 政策仓库可替换为版本化数据库；内存 TTL 可替换为 Redis；演示提取器可替换为受控采集与模型服务；应用用例、API 契约与规则引擎保持不变。</div>
+      </section>
     </main>
+    <script src="./app.js"></script>
   </body>
 </html>

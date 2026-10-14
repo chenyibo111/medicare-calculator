@@ -6,8 +6,9 @@ import { PolicyPublisher } from "../../packages/application/src/publish-policy.j
 import { DemoExtractionAdapter } from "../../packages/infrastructure/src/demo-extraction-adapter.js";
 import { LocalPolicySource } from "../../packages/infrastructure/src/local-policy-source.js";
 import { LocalReviewGateway } from "../../packages/infrastructure/src/local-review-gateway.js";
+import type { PublishedPolicy } from "../../packages/domain/src/policy.js";
 
-const proposedPolicy = {
+const proposedPolicy: PublishedPolicy = {
   region: "测试城市",
   benefitPlan: "居民医保",
   version: "T-2026.02",
