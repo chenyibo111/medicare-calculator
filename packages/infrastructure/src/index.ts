@@ -5,3 +5,5 @@ export * from "./local-policy-publication-store.js";
 export * from "./local-policy-source.js";
 export * from "./local-review-gateway.js";
 export * from "./ttl-policy-cache.js";
+export * from "./postgres/client.js";
+export * from "./postgres/migration-runner.js";

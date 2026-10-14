@@ -27,6 +27,6 @@ for (const script of [migrationScript, seedScript]) {
   }
 }
 
-await run(process.execPath, [migrationScript.pathname]);
-await run(process.execPath, [seedScript.pathname]);
+await run("pnpm", ["exec", "tsx", migrationScript.pathname]);
+await run("pnpm", ["exec", "tsx", seedScript.pathname]);
 await run("pnpm", ["--filter", "@medicare/service-web", "start"]);
