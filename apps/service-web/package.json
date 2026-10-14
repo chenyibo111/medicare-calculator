@@ -1,0 +1,15 @@
+{
+  "name": "@medicare/service-web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build"
+  },
+  "dependencies": {
+    "next": "15.5.2",
+    "react": "19.1.1",
+    "react-dom": "19.1.1",
+    "zod": "4.6.5"
+  }
+}

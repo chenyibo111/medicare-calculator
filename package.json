@@ -1,0 +1,34 @@
+{
+  "name": "medicare-calculator-mvp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.25.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "typecheck": "tsc --noEmit -p tsconfig.base.json",
+    "build:offline": "node scripts/build-offline.mjs",
+    "dev:service": "pnpm --filter @medicare/service-web dev",
+    "build:service": "pnpm --filter @medicare/service-web build",
+    "worker:demo": "tsx worker/src/run-policy-pipeline.ts",
+    "verify": "npm run typecheck && npm test && npm run build:offline && npm run test:e2e"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.55.0",
+    "@types/node": "22.18.0",
+    "@types/react": "19.1.12",
+    "@types/react-dom": "19.1.9",
+    "esbuild": "0.25.9",
+    "tsx": "4.23.15",
+    "typescript": "5.9.2",
+    "vitest": "3.2.4"
+  }
+}

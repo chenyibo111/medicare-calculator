@@ -1,0 +1,7 @@
+node_modules/
+.superpowers/
+.next/
+apps/offline-demo/dist/
+playwright-report/
+test-results/
+*.log
