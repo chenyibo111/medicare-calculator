@@ -7,5 +7,13 @@ export default defineConfig({
     ...devices["Desktop Chrome"],
     locale: "zh-CN",
   },
-  projects: [{ name: "offline" }],
+  webServer: {
+    command: "pnpm --filter @medicare/service-web exec next dev -p 3011",
+    url: "http://127.0.0.1:3011",
+    reuseExistingServer: true,
+  },
+  projects: [
+    { name: "offline", grep: /@offline/ },
+    { name: "service", grep: /@service/ },
+  ],
 });

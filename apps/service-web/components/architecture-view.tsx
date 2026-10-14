@@ -1,0 +1,3 @@
+export function ArchitectureView() {
+  return <section className="service-architecture" aria-labelledby="architecture-title"><p className="service-eyebrow">方案设计</p><h2 id="architecture-title">可演进的后端边界</h2><div className="service-architecture-grid"><article><strong>政策获取</strong><span>生产版：受控采集 / API 接入</span><small>MVP：本地原始政策样例</small></article><article><strong>AI 提取与审核</strong><span>AI 只生成待审核草稿</span><small>人工审批后才可版本化发布</small></article><article><strong>计算与缓存</strong><span>用例层调用共享规则引擎</span><small>MVP：文件仓库 + 内存 TTL；生产可替换数据库 + Redis</small></article><article><strong>对外服务</strong><span>API 返回金额、版本、轨迹与缓存状态</span><small>浏览器不持有比例和计算公式</small></article></div></section>;
+}
