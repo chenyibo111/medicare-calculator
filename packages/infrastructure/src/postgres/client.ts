@@ -1,4 +1,4 @@
-import { Pool, type QueryResultRow } from "pg";
+import { Pool, type PoolClient, type QueryResultRow } from "pg";
 import type { SqlExecutor, SqlQueryResult } from "./migration-runner.js";
 
 export class PostgresSqlExecutor implements SqlExecutor {
@@ -14,6 +14,28 @@ export class PostgresSqlExecutor implements SqlExecutor {
 
   async close(): Promise<void> {
     await this.pool.end();
+  }
+
+  async transaction<T>(operation: (executor: SqlExecutor) => Promise<T>): Promise<T> {
+    const client = await this.pool.connect();
+    const transactionExecutor: SqlExecutor = {
+      async query(sql, values = []) {
+        const result = await client.query<QueryResultRow>(sql, [...values]);
+        return { rows: result.rows };
+      },
+    };
+
+    await client.query("BEGIN");
+    try {
+      const result = await operation(transactionExecutor);
+      await client.query("COMMIT");
+      return result;
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 }
 

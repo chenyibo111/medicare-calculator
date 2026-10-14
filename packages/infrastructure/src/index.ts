@@ -7,3 +7,7 @@ export * from "./local-review-gateway.js";
 export * from "./ttl-policy-cache.js";
 export * from "./postgres/client.js";
 export * from "./postgres/migration-runner.js";
+export * from "./postgres/policy-row-mapper.js";
+export * from "./postgres/postgres-audit-log.js";
+export * from "./postgres/postgres-policy-repository.js";
+export * from "./postgres/postgres-policy-publication-store.js";
