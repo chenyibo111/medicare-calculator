@@ -50,7 +50,11 @@ importers:
 
   packages/application: {}
 
-  packages/contracts: {}
+  packages/contracts:
+    dependencies:
+      zod:
+        specifier: 4.6.5
+        version: 4.6.5
 
   packages/domain: {}
 
