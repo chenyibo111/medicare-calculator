@@ -111,6 +111,63 @@ docs/                         架构图、演示剧本和运行说明
 - API 测试验证浏览器无法传入或覆盖政策比例，且结果带有版本和轨迹。
 - 对相同输入运行离线与服务版，断言金额和轨迹一致。
 
+## MVP 与生产版本差异及演进路径
+
+MVP 的目的，是以真实可运行的模块边界证明架构，而不是用“伪生产”组件掩盖缺失能力。每个 MVP 替代实现都必须通过端口接口接入；业务层和 API 契约不得依赖其文件系统或内存细节。这样升级生产组件时不改变报销引擎、应用用例或浏览器请求格式。
+
+| 模块 | 本次 MVP 的真实实现 | 生产版本目标 | 已预留的替换入口 | 后续实现与验证 |
+| --- | --- | --- | --- | --- |
+| 政策来源获取 | Worker 从 `data/raw-policy-sources` 读取城市 A/B 的本地原始材料。 | 官方医保局网站/API、可信公告订阅、附件下载与来源签名校验。 | `PolicySourceConnector.fetch(sourceConfig)`。 | 为每个来源实现适配器；增加断点续传、内容哈希、变更检测、来源健康度与人工介入队列。 |
+| OCR 与 AI 提取 | `PolicyExtractionAdapter` 生成明确标为“待审核”的结构化建议，不访问真实模型。 | 异步 OCR、RAG 证据定位、LLM 字段提取、规则差异识别与置信度评分。 | `PolicyExtractionAdapter.propose(rawSource)`，输出含原文定位、置信度和建议字段的草稿。 | 接入模型网关与提示词版本；使用标注集评测字段准确率；低置信度进入人工复核，任何置信度均无发布权限。 |
+| 审核与发布 | 脚本模拟审核通过后从草稿发布为本地 JSON，并失效缓存。 | 带角色授权、双人复核、四眼原则、审批记录、灰度发布和一键回滚的管理工作台。 | `PolicyReviewGateway.approve(draft, reviewer)` 与 `PolicyPublisher.publish(version)`。 | 接入身份与 RBAC；持久化审批流；在发布前运行规则 lint、金标回归、影响范围分析和灰度审批。 |
+| 已发布政策仓库 | `FilePolicyRepository` 读取版本化 JSON。 | PostgreSQL 等关系库保存地域、适用条件、生效区间、版本、来源和审核链路；对象存储保留原始附件。 | `PolicyRepository.findPublished(criteria)`、`saveDraft`、`publish` 与 `rollback`。 | 设计迁移脚本和唯一约束；增加生效时间查询索引、地域层级索引、备份、灾备和政策历史重放。 |
+| 服务端缓存 | 进程内 TTL 缓存，按政策版本键命中和主动失效。 | Redis Cluster 或托管缓存，配合本地一级缓存、失效事件与热点预热。 | `PolicyCache.getOrLoad(key, loader)`、`invalidateByPolicyVersion(version)`。 | 添加 Redis 适配器、分布式锁、TTL 抖动、缓存指标和发布事件订阅；压测冷启动、热点地区和失效风暴。 |
+| 在线计算服务 | 一个 Next.js API 运行时调用应用层和领域引擎。 | 无状态计算服务多实例部署在容器或 Serverless 平台，前置 API Gateway、负载均衡和限流。 | API DTO 与 `CalculateReimbursementUseCase.execute(request, context)`。 | 将组合根迁移到独立服务而不改领域代码；接入超时、幂等键、限流、熔断、水平扩缩和区域化部署。 |
+| 报销规则引擎 | TypeScript 纯函数，覆盖题目给出的两座城市和住院规则。 | 可配置 DSL 或受控规则图，支持地域差异、门诊/住院、目录、病种、时间有效期和复杂条件。 | `ReimbursementEngine.calculate(policy, request)`，政策模型中的规则段与条件段。 | 先扩展规则模型，再添加解析器和 lint；每种新规则先添加金标和属性测试，禁止在 API 路由中增加公式。 |
+| 审计与追溯 | API 返回 `calculationId`、政策版本、缓存状态和步骤轨迹；日志为本地实现。 | 不可变审计事件流、检索索引、追踪链路、回放工具和合规留存策略。 | `AuditLog.append(event)` 与稳定的 `CalculationTrace` 模型。 | 接入事件总线和集中日志；保存输入快照哈希、规则版本和结果哈希；提供按 calculationId 回放和差异比较。 |
+| 异步任务与事件 | Worker 通过手动命令运行。 | 队列驱动的采集、提取、审核通知、发布和缓存失效工作流。 | `JobQueue.enqueue(job)`、`EventBus.publish(event)`；MVP 提供进程内实现。 | 接入消息队列、重试/死信队列、幂等键、任务监控和告警；将发布与缓存失效设计为可重试事务。 |
+| 身份、隐私与权限 | 不采集真实身份或病历；页面只使用示例金额。 | 用户登录、服务间身份、最小权限、字段脱敏、加密、数据分级、审计和用户删除请求。 | 请求上下文 `RequestContext` 与 `PolicyReviewGateway` 的 reviewer 参数。 | 先完成数据分类和威胁建模，再接入 OIDC/RBAC、密钥管理、加密、保留期限和隐私影响评估。 |
+| 可观测性与运维 | 页面显示开发演示所需的政策版本、缓存状态和追踪标识。 | 指标、日志、链路追踪、SLO、异常告警、成本看板与值班响应。 | `Telemetry.record(metric)` 与请求追踪上下文。 | 接入 OpenTelemetry、指标平台和日志平台；建立计算错误率、政策时效、缓存命中率、队列积压和成本告警。 |
+| 前端交付 | 静态离线 H5 与 Next.js 服务版页面，共享接口与展示模型。 | App、小程序、H5 共享 BFF/API 契约，具备登录、历史测算、政策说明、无障碍和多端发布能力。 | `ReimbursementCalculationResponse` 契约与无业务公式的前端状态层。 | 保持 API 向后兼容；增加端到端合约测试和设计系统；按端接入身份、埋点与特定交互。 |
+
+### 必须存在的端口接口
+
+以下接口是代码仓库的强制骨架，即使 MVP 先使用本地实现，也不得由页面或应用层绕过。接口名称可随语言惯例调整，职责不得合并或删除。
+
+```text
+PolicySourceConnector.fetch(sourceConfig) -> RawPolicySource
+PolicyExtractionAdapter.propose(rawSource) -> PolicyDraft
+PolicyReviewGateway.approve(draft, reviewer) -> ApprovedPolicyDraft
+PolicyPublisher.publish(approvedDraft) -> PublishedPolicyVersion
+PolicyRepository.findPublished(criteria) -> PublishedPolicyVersion
+PolicyCache.getOrLoad(key, loader) -> CachedPolicy
+PolicyCache.invalidateByPolicyVersion(version) -> void
+ReimbursementEngine.calculate(policy, request) -> CalculationResult
+AuditLog.append(calculationEvent) -> void
+JobQueue.enqueue(job) -> JobId
+EventBus.publish(event) -> void
+Telemetry.record(metric) -> void
+```
+
+`ReimbursementEngine`、政策匹配和金额对象属于领域层；其余接口由基础设施层实现。离线演示版只能使用本地政策快照和领域层，服务版通过组合根注入仓库、缓存、审计和 Worker 的本地实现。生产替换只能发生在基础设施层。
+
+### 从 MVP 到生产的实施顺序
+
+1. **稳定核心与契约**：完成政策模型、金额精度、规则引擎、金标用例和计算 API 契约；这是后续所有替换的兼容基线。
+2. **完成双运行形态**：离线版使用政策快照；服务版从 API 调用同一应用用例，并用契约测试保证两版一致。
+3. **完成可审计的本地闭环**：实现文件仓库、TTL 缓存、审核门禁、发布、缓存失效、Worker 和 traceId；先保证过程可观测和可重放。
+4. **替换政策运营能力**：接入真实来源、OCR/AI 提取和人工审核工作台；先在少量统筹区建立金标、审核 SLA 和回滚流程，再逐步扩大覆盖。
+5. **替换存储与缓存能力**：将文件仓库迁移至关系库/对象存储，将内存缓存迁移至 Redis；运行双读、回放比对和压测后切流。
+6. **生产化在线服务**：拆出无状态计算服务，接入 API Gateway、认证、限流、队列、可观测性、数据保护和容灾；以 SLO、容量压测和安全评审为上线门槛。
+
+### 生产上线前的不可省略门槛
+
+- 每一条上线政策必须可追溯到原始来源、有效期、审核记录和规则版本。
+- 规则金标、回归测试和历史回放均通过；计算引擎与政策变更必须独立审查。
+- 真实用户输入不进入训练或提取链路；敏感数据的访问、加密、留存和删除策略已通过合规审查。
+- 缓存、数据库、队列和计算服务均通过容量、故障恢复和失效一致性演练。
+- 监控能够发现政策过期、来源同步失败、计算异常、缓存异常、队列积压和接口可用性下降。
+
 ## 非目标与生产替换点
 
 本 MVP 不实现真实政府站点接入、真实 OCR/LLM、真实身份认证、真实支付结算、真实 Redis/数据库或全量统筹区覆盖。代码通过端口接口和文档说明这些替换点：官方来源连接器、AI 提取器、人工审核工作台、关系型政策仓库、Redis 缓存、消息队列和可观测性平台。
