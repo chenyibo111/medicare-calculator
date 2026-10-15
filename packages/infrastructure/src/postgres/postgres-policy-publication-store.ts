@@ -1,11 +1,8 @@
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import type { PolicyPublicationStore } from "../../../application/src/publish-policy.js";
 import type { SqlExecutor } from "./migration-runner.js";
 import type { PostgresSqlExecutor } from "./client.js";
-
-function contentHash(value: unknown): string {
-  return createHash("sha256").update(JSON.stringify(value)).digest("hex");
-}
+import { loadApprovedPolicyDraft } from "./postgres-policy-review-store.js";
 
 export class PostgresPolicyPublicationStore implements PolicyPublicationStore {
   constructor(private readonly database: PostgresSqlExecutor) {}
@@ -22,26 +19,19 @@ export class PostgresPolicyPublicationStore implements PolicyPublicationStore {
     executor: SqlExecutor,
     { approvedDraft, publication }: Parameters<PolicyPublicationStore["publishApprovedVersion"]>[0],
   ): Promise<void> {
-    const sourceId = randomUUID();
-    const draftId = randomUUID();
+    const persistedDraft = await loadApprovedPolicyDraft(executor, approvedDraft.id, true);
+    if (
+      persistedDraft === null
+      || persistedDraft.approvalId !== approvedDraft.approvalId
+      || persistedDraft.reviewer !== approvedDraft.reviewer
+      || persistedDraft.policy.version !== approvedDraft.policy.version
+    ) {
+      throw new Error("审核凭证无效，不能发布政策");
+    }
+
+    const sourceId = persistedDraft.source.sourceId;
     const versionId = randomUUID();
     const eventId = randomUUID();
-
-    await executor.query(
-      `INSERT INTO policy_sources (id, region, source_url, content_hash, captured_at)
-       VALUES ($1::uuid, $2, $3, $4, $5::timestamptz)`,
-      [sourceId, publication.policy.region, approvedDraft.source.sourceUrl, contentHash(approvedDraft.source), approvedDraft.approvedAt],
-    );
-    await executor.query(
-      `INSERT INTO policy_drafts (id, source_id, policy_payload, evidence, status)
-       VALUES ($1::uuid, $2::uuid, $3::jsonb, $4::jsonb, 'pending_review')`,
-      [draftId, sourceId, JSON.stringify(approvedDraft.policy), JSON.stringify([{ approvalId: approvedDraft.approvalId }])],
-    );
-    await executor.query(
-      `INSERT INTO policy_reviews (id, draft_id, reviewer_id, decision, reviewed_at)
-       VALUES ($1::uuid, $2::uuid, $3, 'approved', $4::timestamptz)`,
-      [randomUUID(), draftId, approvedDraft.reviewer, approvedDraft.approvedAt],
-    );
 
     const overlapping = await executor.query(
       `SELECT id, version
@@ -74,5 +64,10 @@ export class PostgresPolicyPublicationStore implements PolicyPublicationStore {
        VALUES ($1::uuid, 'policy.published', $2::uuid, $3::jsonb)`,
       [eventId, versionId, JSON.stringify({ ...publication.event, previousPolicyVersion })],
     );
+    const published = await executor.query(
+      "UPDATE policy_drafts SET status = 'published' WHERE id = $1::uuid AND status = 'approved' RETURNING id",
+      [approvedDraft.id],
+    );
+    if (published.rows.length === 0) throw new Error("审核通过后才能发布政策");
   }
 }

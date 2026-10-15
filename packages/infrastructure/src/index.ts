@@ -11,6 +11,7 @@ export * from "./postgres/policy-row-mapper.js";
 export * from "./postgres/postgres-audit-log.js";
 export * from "./postgres/postgres-policy-repository.js";
 export * from "./postgres/postgres-policy-publication-store.js";
+export * from "./postgres/postgres-policy-review-store.js";
 export * from "./postgres/postgres-outbox-dispatcher.js";
 export * from "./redis/redis-policy-cache.js";
 export * from "./outbox/policy-publication-dispatcher.js";

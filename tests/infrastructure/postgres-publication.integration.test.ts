@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { createPostgresSqlExecutor } from "../../packages/infrastructure/src/postgres/client.js";
 import { PostgresPolicyPublicationStore } from "../../packages/infrastructure/src/postgres/postgres-policy-publication-store.js";
+import { PostgresPolicyReviewStore } from "../../packages/infrastructure/src/postgres/postgres-policy-review-store.js";
 
 const integration = process.env.DATABASE_URL ? describe : describe.skip;
 
@@ -9,6 +10,7 @@ integration("PostgreSQL 政策发布事务", () => {
   it("同一事务中写入已发布版本、替换状态和 Outbox 事件", async () => {
     const executor = createPostgresSqlExecutor(process.env.DATABASE_URL!);
     const store = new PostgresPolicyPublicationStore(executor);
+    const reviewStore = new PostgresPolicyReviewStore(executor);
     const version = `TXN-${randomUUID()}`;
     const draft = {
       id: randomUUID(),
@@ -38,10 +40,20 @@ integration("PostgreSQL 政策发布事务", () => {
     };
 
     try {
+      await reviewStore.createDraft({ id: draft.id, source: draft.source, policy: draft.policy, createdAt: draft.approvedAt });
+      await reviewStore.submitDraft({ draftId: draft.id, submittedBy: "transaction-author", submittedAt: draft.approvedAt });
+      await reviewStore.decideDraft({
+        draftId: draft.id,
+        reviewerId: draft.reviewer,
+        decision: "approved",
+        reason: "事务测试审核通过",
+        reviewedAt: draft.approvedAt,
+      });
+      const persistedDraft = await reviewStore.getApprovedDraft(draft.id);
       await store.publishApprovedVersion({
-        approvedDraft: draft,
+        approvedDraft: persistedDraft!,
         publication: {
-          policy: { ...draft.policy, status: "published" },
+          policy: { ...persistedDraft!.policy, status: "published" },
           event: {
             eventType: "policy.published",
             region: draft.policy.region,
@@ -73,6 +85,7 @@ integration("PostgreSQL 政策发布事务", () => {
   it("发布重叠新版本时把真实旧版本写入 Outbox 并废弃旧版本", async () => {
     const executor = createPostgresSqlExecutor(process.env.DATABASE_URL!);
     const store = new PostgresPolicyPublicationStore(executor);
+    const reviewStore = new PostgresPolicyReviewStore(executor);
     const region = `版本切换测试市-${randomUUID()}`;
     const v1 = `V1-${randomUUID()}`;
     const v2 = `V2-${randomUUID()}`;
@@ -104,10 +117,20 @@ integration("PostgreSQL 政策发布事务", () => {
     });
     const publish = async (version: string) => {
       const draft = createDraft(version);
+      await reviewStore.createDraft({ id: draft.id, source: draft.source, policy: draft.policy, createdAt: draft.approvedAt });
+      await reviewStore.submitDraft({ draftId: draft.id, submittedBy: "version-author", submittedAt: draft.approvedAt });
+      await reviewStore.decideDraft({
+        draftId: draft.id,
+        reviewerId: draft.reviewer,
+        decision: "approved",
+        reason: "版本切换测试审核通过",
+        reviewedAt: draft.approvedAt,
+      });
+      const persistedDraft = await reviewStore.getApprovedDraft(draft.id);
       await store.publishApprovedVersion({
-        approvedDraft: draft,
+        approvedDraft: persistedDraft!,
         publication: {
-          policy: { ...draft.policy, status: "published" },
+          policy: { ...persistedDraft!.policy, status: "published" },
           event: {
             eventType: "policy.published",
             region,
