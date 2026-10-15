@@ -57,10 +57,11 @@ export function createComposeAcceptanceDraftInput(version: ComposeAcceptancePoli
   readonly policy: PublishedPolicy;
 } {
   const region = "Compose验收市";
+  const draftToken = randomUUID().slice(0, 8);
   const policy: PublishedPolicy = {
     region,
     benefitPlan: "居民医保",
-    version: `compose-console-${version}`,
+    version: `compose-console-${version}-${draftToken}`,
     effectiveFrom: "2026-10-15",
     sourceReference: `本地评测后台固定 Compose 验收政策 ${version}`,
     hospitalRules: {

@@ -58,6 +58,12 @@ docker compose --env-file .env exec -T policy-worker pnpm run compose:publish-ac
 
 要演示持久化审核与发布闭环，在 `.env` 增加 `MEDICARE_ADMIN_CONSOLE=true` 后重新执行 `docker compose --env-file .env up --build -d`，再访问 `http://localhost:3010/admin/policy-review`。后台提供固定的本地录入员/审核员身份，草稿必须经历“创建 → 提交 → 异人批准 → 发布”；它不是生产登录。生产通过 `OperatorIdentityProvider` 替换为企业 SSO/OAuth，用户测算页不会出现后台链接。
 
+后台的真实 Compose 浏览器验收会创建唯一版本的草稿，并验证完整异人审核与发布闭环：
+
+```powershell
+pnpm run test:e2e:compose-admin
+```
+
 ### 4. 政策处理演示
 
 ```powershell

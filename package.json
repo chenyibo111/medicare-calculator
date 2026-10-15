@@ -14,6 +14,7 @@
   "scripts": {
     "test": "vitest run",
     "test:e2e": "playwright test",
+    "test:e2e:compose-admin": "playwright test --config playwright-compose-admin.config.ts",
     "typecheck": "tsc --noEmit -p tsconfig.base.json",
     "build:offline": "node scripts/build-offline.mjs",
     "dev:service": "pnpm --filter @medicare/service-web dev",
