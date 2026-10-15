@@ -27,4 +27,58 @@ integration("PostgresOutboxDispatcher", () => {
       await database.close();
     }
   });
+
+  it("投递失败时保留事件供后续重试", async () => {
+    const database = createPostgresSqlExecutor(process.env.DATABASE_URL!);
+    const dispatcher = new PostgresOutboxDispatcher(database);
+    const eventId = randomUUID();
+
+    try {
+      await database.query(
+        `INSERT INTO policy_outbox_events (id, event_type, aggregate_id, payload)
+         VALUES ($1::uuid, 'policy.published', $2::uuid, $3::jsonb)`,
+        [eventId, randomUUID(), JSON.stringify({ newPolicyVersion: "retry-test" })],
+      );
+
+      await expect(dispatcher.processNext(async () => {
+        throw new Error("temporary delivery failure");
+      })).rejects.toThrow("temporary delivery failure");
+
+      const result = await database.query(
+        "SELECT processed_at FROM policy_outbox_events WHERE id = $1::uuid",
+        [eventId],
+      );
+      expect(result.rows).toEqual([{ processed_at: null }]);
+    } finally {
+      await database.query("DELETE FROM policy_outbox_events WHERE id = $1::uuid", [eventId]);
+      await database.close();
+    }
+  });
+
+  it("并发消费者只会领取同一事件一次", async () => {
+    const firstDatabase = createPostgresSqlExecutor(process.env.DATABASE_URL!);
+    const secondDatabase = createPostgresSqlExecutor(process.env.DATABASE_URL!);
+    const eventId = randomUUID();
+    let deliveries = 0;
+
+    try {
+      await firstDatabase.query(
+        `INSERT INTO policy_outbox_events (id, event_type, aggregate_id, payload)
+         VALUES ($1::uuid, 'policy.published', $2::uuid, $3::jsonb)`,
+        [eventId, randomUUID(), JSON.stringify({ newPolicyVersion: "concurrent-test" })],
+      );
+
+      const results = await Promise.all([
+        new PostgresOutboxDispatcher(firstDatabase).processNext(async () => { deliveries += 1; }),
+        new PostgresOutboxDispatcher(secondDatabase).processNext(async () => { deliveries += 1; }),
+      ]);
+
+      expect(results.sort()).toEqual([false, true]);
+      expect(deliveries).toBe(1);
+    } finally {
+      await firstDatabase.query("DELETE FROM policy_outbox_events WHERE id = $1::uuid", [eventId]);
+      await firstDatabase.close();
+      await secondDatabase.close();
+    }
+  });
 });

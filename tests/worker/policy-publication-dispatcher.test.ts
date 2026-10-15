@@ -42,4 +42,37 @@ describe("PolicyPublicationDispatcher", () => {
     expect(invalidated).toEqual(["A-2026.01"]);
     expect(cacheKeys).toEqual(["policy:v1:城市A:职工医保:2026-12-01"]);
   });
+
+  it("处理完成时把 Outbox 事件交给运行日志观察器", async () => {
+    const observed: Array<{ id: string; outcome: string }> = [];
+    const dispatcher = new PolicyPublicationDispatcher({
+      outbox: {
+        async processNext(deliver: (event: StoredOutboxEvent) => Promise<void>) {
+          await deliver({
+            id: "event-log-1",
+            eventType: "policy.published",
+            aggregateId: "policy-log-1",
+            payload: {
+              region: "城市A",
+              benefitPlan: "职工医保",
+              effectiveFrom: "2026-10-15",
+            },
+          });
+          return true;
+        },
+      } as never,
+      cache: {
+        async invalidateByPolicyVersion() {},
+        async getOrLoad(_key, loader) { return { value: await loader(), status: "miss" as const }; },
+      },
+      repository: {
+        async findPublished() { return { version: "A-2026.02" } as never; },
+      },
+      onEvent: (event, outcome) => { observed.push({ id: event.id, outcome }); },
+    });
+
+    await dispatcher.processNext();
+
+    expect(observed).toEqual([{ id: "event-log-1", outcome: "processed" }]);
+  });
 });
