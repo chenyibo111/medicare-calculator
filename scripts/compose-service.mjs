@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { spawn } from "node:child_process";
 
-const root = new URL("../", import.meta.url);
+const root = new URL("./", import.meta.url);
 const migrationScript = new URL("db-migrate.mjs", root);
 const seedScript = new URL("db-seed.mjs", root);
 

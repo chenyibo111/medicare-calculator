@@ -37,14 +37,14 @@ integration("PostgreSQL 政策基础 schema", () => {
       expect(indexes.rows.map((row) => row.indexname)).toContain("policy_versions_lookup_idx");
 
       const demoPolicies = await executor.query(`
-        SELECT region, version, status
+        SELECT region, version, benefit_plan, status
         FROM policy_versions
-        WHERE status = 'published'
+        WHERE status = 'published' AND region IN ('城市A', '城市B')
         ORDER BY region
       `);
       expect(demoPolicies.rows).toEqual([
-        { region: "城市A", version: "A-2026.01", status: "published" },
-        { region: "城市B", version: "B-2026.01", status: "published" },
+        { region: "城市A", version: "A-2026.01", benefit_plan: "职工医保", status: "published" },
+        { region: "城市B", version: "B-2026.01", benefit_plan: "居民医保", status: "published" },
       ]);
     } finally {
       await executor.close();

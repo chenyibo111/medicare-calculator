@@ -7,8 +7,15 @@ ON CONFLICT (content_hash) DO NOTHING;
 INSERT INTO policy_drafts (id, source_id, policy_payload, evidence, status)
 VALUES
   ('00000000-0000-4000-8000-0000000000a2', '00000000-0000-4000-8000-0000000000a1', '{"region":"城市A","benefitPlan":"职工医保","version":"A-2026.01"}'::jsonb, '[{"type":"demo-source","reference":"城市 A 示例政策"}]'::jsonb, 'pending_review'),
-  ('00000000-0000-4000-8000-0000000000b2', '00000000-0000-4000-8000-0000000000b1', '{"region":"城市B","benefitPlan":"职工医保","version":"B-2026.01"}'::jsonb, '[{"type":"demo-source","reference":"城市 B 示例政策"}]'::jsonb, 'pending_review')
-ON CONFLICT (id) DO NOTHING;
+  ('00000000-0000-4000-8000-0000000000b2', '00000000-0000-4000-8000-0000000000b1', '{"region":"城市B","benefitPlan":"居民医保","version":"B-2026.01"}'::jsonb, '[{"type":"demo-source","reference":"城市 B 示例政策"}]'::jsonb, 'pending_review')
+ON CONFLICT (id) DO UPDATE
+  SET policy_payload = EXCLUDED.policy_payload,
+      evidence = EXCLUDED.evidence;
+
+UPDATE policy_versions
+SET benefit_plan = '居民医保',
+    policy_payload = '{"region":"城市B","benefitPlan":"居民医保","version":"B-2026.01","effectiveFrom":"2026-01-01","sourceReference":"示例城市 B 医保政策","hospitalRules":{"community":{"deductibleFen":10000,"reimbursementRateBps":8500},"secondary":{"deductibleFen":30000,"reimbursementRateBps":7500},"tertiary":{"deductibleFen":60000,"reimbursementRateBps":6500}},"classBAdvanceRateBps":1500,"annualCapFen":20000000,"retirementBonusBps":0,"unfiledOutOfAreaReductionBps":1500,"catastrophicTiers":[]}'::jsonb
+WHERE region = '城市B' AND version = 'B-2026.01';
 
 INSERT INTO policy_reviews (id, draft_id, reviewer_id, decision, reviewed_at)
 VALUES
@@ -27,9 +34,9 @@ VALUES
     '2026-01-02T00:00:00Z'
   ),
   (
-    '00000000-0000-4000-8000-0000000000b4', '城市B', '职工医保', 'B-2026.01', '2026-01-01', NULL, 'published',
+    '00000000-0000-4000-8000-0000000000b4', '城市B', '居民医保', 'B-2026.01', '2026-01-01', NULL, 'published',
     '00000000-0000-4000-8000-0000000000b1',
-    '{"region":"城市B","benefitPlan":"职工医保","version":"B-2026.01","effectiveFrom":"2026-01-01","sourceReference":"示例城市 B 医保政策","hospitalRules":{"community":{"deductibleFen":10000,"reimbursementRateBps":8500},"secondary":{"deductibleFen":30000,"reimbursementRateBps":7500},"tertiary":{"deductibleFen":60000,"reimbursementRateBps":6500}},"classBAdvanceRateBps":1500,"annualCapFen":20000000,"retirementBonusBps":0,"unfiledOutOfAreaReductionBps":1500,"catastrophicTiers":[]}'::jsonb,
+    '{"region":"城市B","benefitPlan":"居民医保","version":"B-2026.01","effectiveFrom":"2026-01-01","sourceReference":"示例城市 B 医保政策","hospitalRules":{"community":{"deductibleFen":10000,"reimbursementRateBps":8500},"secondary":{"deductibleFen":30000,"reimbursementRateBps":7500},"tertiary":{"deductibleFen":60000,"reimbursementRateBps":6500}},"classBAdvanceRateBps":1500,"annualCapFen":20000000,"retirementBonusBps":0,"unfiledOutOfAreaReductionBps":1500,"catastrophicTiers":[]}'::jsonb,
     '2026-01-02T00:00:00Z'
   )
 ON CONFLICT (region, benefit_plan, version) DO NOTHING;

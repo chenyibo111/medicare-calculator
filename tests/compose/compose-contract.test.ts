@@ -80,4 +80,30 @@ describe("Compose 运行契约", () => {
     });
     expect(ignored.status).toBe(0);
   });
+
+  it("使用兼容仓库 pnpm 版本的 Node 22 基础镜像", () => {
+    const dockerfile = readFileSync(
+      resolve(root, "apps/service-web/Dockerfile"),
+      "utf8",
+    );
+
+    expect(dockerfile).toMatch(/^FROM node:22-alpine$/m);
+  });
+
+  it("从 scripts 目录定位迁移与种子脚本", () => {
+    const launcher = readFileSync(
+      resolve(root, "scripts/compose-service.mjs"),
+      "utf8",
+    );
+
+    expect(launcher).toContain('const root = new URL("./", import.meta.url);');
+  });
+
+  it("服务包提供镜像所需的生产启动命令", () => {
+    const servicePackage = JSON.parse(
+      readFileSync(resolve(root, "apps/service-web/package.json"), "utf8"),
+    ) as { scripts?: Record<string, string> };
+
+    expect(servicePackage.scripts?.start).toBe("next start");
+  });
 });
