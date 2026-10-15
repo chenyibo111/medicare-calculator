@@ -34,6 +34,7 @@ describe("offline policy pipeline", () => {
       sourceId: "source-1",
       region: "测试城市",
       sourceUrl: "https://example.test/policy",
+      capturedAt: "2026-10-15T00:00:00.000Z",
       proposedPolicy,
     }));
 
@@ -42,16 +43,26 @@ describe("offline policy pipeline", () => {
 
     expect(draft.status).toBe("pending_review");
     expect(draft.demoAIProposal).toBe(true);
+    expect(draft.extraction).toEqual({ method: "demo_static", adapterVersion: "1.0.0", aiAssisted: false });
     expect(draft.source.sourceUrl).toBe("https://example.test/policy");
     expect(draft.policy.version).toBe("T-2026.02");
   });
 
   it("refuses direct publication and writes an Outbox event only with an approved version", async () => {
-    const source = {
+    const sourceDocument = {
       sourceId: "source-1",
       region: "测试城市",
       sourceUrl: "https://example.test/policy",
+      capturedAt: "2026-10-15T00:00:00.000Z",
       proposedPolicy,
+    };
+    const source = {
+      sourceId: "source-capture-1",
+      region: "测试城市",
+      sourceUrl: "https://example.test/policy",
+      capturedAt: "2026-10-15T00:00:00.000Z",
+      artifact: { fileName: "policy.json", format: "json" as const, sha256: "a".repeat(64), byteLength: 512 },
+      rawDocument: JSON.stringify(sourceDocument),
     };
     const draft = await new DemoExtractionAdapter().propose(source);
     const saved: unknown[] = [];

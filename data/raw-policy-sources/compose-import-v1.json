@@ -1,0 +1,22 @@
+{
+  "region": "Compose验收市",
+  "sourceUrl": "https://example.test/compose/import-v1",
+  "capturedAt": "2026-10-15T00:00:00.000Z",
+  "policy": {
+    "region": "Compose验收市",
+    "benefitPlan": "居民医保",
+    "version": "compose-import-v1",
+    "effectiveFrom": "2026-10-15",
+    "sourceReference": "仓库受控 Compose 导入政策（仅评测）",
+    "hospitalRules": {
+      "community": { "deductibleFen": 80000, "reimbursementRateBps": 7000 },
+      "secondary": { "deductibleFen": 80000, "reimbursementRateBps": 7000 },
+      "tertiary": { "deductibleFen": 80000, "reimbursementRateBps": 7000 }
+    },
+    "classBAdvanceRateBps": 0,
+    "annualCapFen": 5000000,
+    "retirementBonusBps": 0,
+    "unfiledOutOfAreaReductionBps": 0,
+    "catastrophicTiers": []
+  }
+}
