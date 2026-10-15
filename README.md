@@ -1,8 +1,8 @@
 # 医保报销计算器 MVP
 
-一个可用于企业 AI 实践评测的“双运行模式”医保住院报销预估产品：既能直接打开离线 H5，也能启动 Next.js 服务版。两种模式都只覆盖城市 A / B 的示例住院政策，页面始终标注“**示例政策，仅供演示**”。
+一个可用于企业 AI 实践评测的医保住院报销预估产品，提供离线 H5、快速测试服务和 Docker Compose 三条可运行路径。两种页面均只覆盖城市 A / B 的示例住院政策，始终标注“**示例政策，仅供演示**”。
 
-> 不接入真实参保信息、真实医保结算、真实政府站点、真实模型服务、Redis 或数据库；结果是规则预估，不是医保结算承诺。
+> 不接入真实参保信息、真实医保结算、真实政府站点或真实模型服务。Compose 路径已使用 PostgreSQL 与 Redis，但数据仅为可审阅的示例政策；结果是规则预估，不是医保结算承诺。
 
 ## 快速运行
 
@@ -20,15 +20,33 @@ pnpm run build:offline
 
 直接用浏览器打开 `apps/offline-demo/dist/index.html`。它是一个没有 API 请求的静态 H5：政策快照和共享规则引擎都已打包到本地资源中。
 
-### 2. 启动服务版
+### 2. 快速测试服务版
 
 ```powershell
 pnpm run dev:service
 ```
 
-访问 `http://localhost:3000`。浏览器只向 `POST /api/v1/reimbursement-calculations` 发送 DTO；政策选择、缓存读取和规则计算均在服务端完成。
+访问 `http://localhost:3000`。此路径显式使用文件/内存测试适配器，适合快速 UI 与 API 测试；浏览器只向 `POST /api/v1/reimbursement-calculations` 发送 DTO。
 
-### 3. 政策处理演示
+### 3. Docker Compose 服务版
+
+```powershell
+Copy-Item .env.example .env
+# 编辑 .env：设置 POSTGRES_PASSWORD；若 5432/6379 已被占用，可修改 POSTGRES_PORT/REDIS_PORT
+docker compose --env-file .env up --build
+```
+
+访问 `http://localhost:3010`。该路径使用 PostgreSQL 政策仓库与审计日志、Redis 政策缓存；启动时执行迁移和可重复的城市 A/B 示例种子。
+
+完整的可复跑验收：
+
+```powershell
+pnpm run verify:compose
+```
+
+该命令验证迁移、种子、一次 Redis miss、一次 Redis hit 和两条 PostgreSQL 审计记录；结束时仅停止本项目容器，保留命名卷。
+
+### 4. 政策处理演示
 
 ```powershell
 pnpm run worker:demo
@@ -36,7 +54,7 @@ pnpm run worker:demo
 
 该命令展示“本地原始材料 → 明确标识的 AI 提案 → 人工审核 → 版本化发布 → 缓存失效”。生成的草稿和演示发布文件被忽略，不会混入受版本控制的示例政策。
 
-### 4. 验证
+### 5. 快速验证
 
 ```powershell
 pnpm run verify
@@ -53,10 +71,10 @@ pnpm exec playwright test --project=service
 
 1. 打开离线版，点击“填入城市 A 样例”，展示预计自费和可展开的计算明细。
 2. 切换退休身份、医院等级或异地备案，说明 UI 只采集条件，规则由共享引擎决定。
-3. 启动服务版，填入城市 B 样例，展示 API 返回的政策版本、请求标识和缓存状态。
-4. 再提交一次相同服务端请求，观察缓存状态由“未命中”变为“命中”。
+3. 运行 `pnpm run verify:compose`，展示 PostgreSQL 迁移/种子、Redis 二次命中和审计记录的一键证据。
+4. 启动 Compose 服务版，填入城市 B 样例，展示 API 返回的政策版本、请求标识和缓存状态。
 5. 运行 Worker，说明 AI 不具备发布权限，必须经过审核门禁。
-6. 查看两版页面的“方案设计/可演进的后端边界”。
+6. 查看离线版“方案设计”中的已实现与待替换边界；服务版只聚焦在线测算。
 
 更完整的演示剧本见 [docs/demo-scenarios.md](docs/demo-scenarios.md)。
 
@@ -67,30 +85,30 @@ pnpm exec playwright test --project=service
 | `packages/domain` | 整数分金额、政策匹配、确定性报销引擎与轨迹 | 不在路由或 UI 复制公式 |
 | `packages/contracts` | 请求/响应 DTO 与 Zod 校验 | 服务 API 的兼容边界 |
 | `packages/application` | 计算用例、审核门禁、发布用例、端口定义 | 不依赖文件/缓存/Next |
-| `packages/infrastructure` | 本地文件政策仓库、TTL 缓存、审计、提取/审核适配器 | 生产版替换此层 |
-| `worker` | 离线政策处理命令 | 可替换为队列消费者 |
+| `packages/infrastructure` | 文件/内存测试替身，以及 PostgreSQL、Redis、Outbox、审计适配器 | 真实来源接入仍待替换 |
+| `worker` | 离线政策处理演示与 Outbox 消费入口 | 可替换为队列消费者 |
 | `apps/offline-demo` | 无网络的演示 H5 | 只读快照适配器 |
 | `apps/service-web` | Next.js 页面、API 路由、服务端组合根 | 客户端不导入政策 |
 
 ## MVP 与生产版本差异
 
-本项目刻意把本地 JSON、内存 TTL、模拟 AI 提案和手动 Worker 明确标为 MVP 适配器。生产演进保持 `ReimbursementEngine`、应用用例与 API DTO 不变，只替换基础设施端口：
+本期已将政策持久化、Redis 缓存、事务发布、Outbox 与计算审计从“替换设想”推进到 Compose 可运行实现；真实政策来源与 AI/OCR 仍是后续替换点。`ReimbursementEngine`、应用用例与 API DTO 保持不变：
 
 | MVP | 生产替换 | 保持不变 |
 | --- | --- | --- |
 | 本地原始政策 JSON | 官方来源连接器、附件存储与变更检测 | `PolicySourceConnector` |
 | 模拟提取建议 | OCR / 受控 LLM / 证据定位 | `PolicyExtractionAdapter`，仍需人工审核 |
-| 文件政策仓库 | 版本化数据库与对象存储 | `PolicyRepository` |
-| 进程内 TTL | Redis / 事件驱动失效 / 热点预热 | `PolicyCache` |
+| 文件政策仓库（快速测试） | PostgreSQL 版本化仓库（Compose 已实现） | `PolicyRepository` |
+| 进程内 TTL（快速测试） | Redis / 事件驱动失效 / 热点预热（Compose 已实现） | `PolicyCache` |
 | Next 单进程 API | 无状态计算服务、网关、限流与扩缩 | DTO 与 `CalculateReimbursementUseCase` |
 | 手动 Worker | 队列、重试、死信和审批工作台 | 发布门禁与审计事件 |
 
-生产路径、AI 边界、缓存策略、正确性校验与性能方案详见 [docs/architecture.md](docs/architecture.md)；完整的设计与替换矩阵见 [MVP 设计说明](docs/superpowers/specs/2026-10-14-medicare-calculator-mvp-design.md)。
+已实现与后续替换矩阵见 [Compose 生产化基础](docs/production-foundation.md)；生产架构、AI 边界、缓存策略、正确性校验与性能方案见 [架构说明](docs/architecture.md)。
 
 ## 可验证事实与限制
 
 - 所有领域金额都以整数“分”计算；只有展示层转为人民币两位小数。
 - 城市 B 未配置大病保险阶梯时，结果明确为 `¥0.00`，不编造规则。
-- AI 只能形成 `pending_review` 草稿；只有审核通过的草稿才能由 `PolicyPublisher` 发布并触发缓存失效。
+- AI / OCR 当前未接入真实来源；后续只能形成 `pending_review` 草稿，发布仍必须经过人工审核门禁。
 - 服务端响应不回传原始政策文件或可由浏览器覆盖的政策比例。
-- `calculationId`、政策版本、缓存状态和稳定步骤轨迹构成当前 MVP 的可追溯证据，不等同于生产级不可变审计存储。
+- Compose 路径已将最小化审计证据持久化到 PostgreSQL；它仍不等同于生产级不可变审计存储。

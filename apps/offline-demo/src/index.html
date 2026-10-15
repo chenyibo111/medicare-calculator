@@ -21,6 +21,11 @@
         </aside>
       </header>
 
+      <aside class="delivery-banner" data-testid="delivery-versions-card" aria-label="两种演示版本说明">
+        <strong>本次交付：两种可运行的演示版本</strong>
+        <div><span><b>离线 H5 Demo：</b>直接打开，使用静态政策快照与本地规则引擎。</span><span><b>在线 API 版：</b>启动服务，浏览器通过 API 调用服务端计算用例。</span></div>
+      </aside>
+
       <div class="mode-tabs" role="tablist" aria-label="页面视图">
         <button id="calculator-tab" type="button" role="tab" aria-selected="true" aria-controls="calculator-panel" onclick="window.medicareOfflineAction?.('calculator')">报销测算</button>
         <button id="architecture-tab" type="button" role="tab" aria-selected="false" aria-controls="architecture-panel" tabindex="-1" onclick="window.medicareOfflineAction?.('architecture')">方案设计</button>
@@ -62,13 +67,81 @@
         </div>
       </section>
       <section id="architecture-panel" role="tabpanel" aria-labelledby="architecture-tab" hidden>
-        <div class="architecture-intro"><p class="step-label">评测重点</p><h2>两种交付模式，一条可演进的后端链路</h2><p>离线版用于立即演示交互与规则可解释性；服务版保留政策获取、审核发布、缓存和 API 的替换入口。</p></div>
-        <div class="architecture-grid">
-          <article class="architecture-card"><p class="card-kicker">离线 Demo</p><h3>浏览器本地测算</h3><p>静态政策快照 + 共享规则引擎 → 本地结算单。无网络请求，不表示实时政策。</p></article>
-          <article class="architecture-card featured"><p class="card-kicker">服务版</p><h3>API 统一执行业务规则</h3><p>页面 → 计算 API → 用例层 → 政策仓库 / TTL 缓存 → 审计记录。浏览器不导入政策比例，也不复制公式。</p></article>
-          <article class="architecture-card"><p class="card-kicker">政策治理</p><h3>AI 只生成待审核草稿</h3><p>原始政策 → AI/OCR 提案 → 人工审核 → 版本化发布 → 缓存失效。AI 不可直接发布，不可决定报销结果。</p></article>
+        <div class="architecture-intro">
+          <p class="step-label">方案设计 · 生产架构视图</p>
+          <h2>从可演示 MVP，到可规模化运行的结算平台</h2>
+          <p>结算规则始终由确定性代码执行，AI 只辅助理解政策，不进入金额决策链路；生产系统则将低频政策治理与高频用户测算彻底分离。</p>
         </div>
-        <div class="replacement-note"><strong>MVP → 生产替换点：</strong>本地 JSON 政策仓库可替换为版本化数据库；内存 TTL 可替换为 Redis；演示提取器可替换为受控采集与模型服务；应用用例、API 契约与规则引擎保持不变。</div>
+
+        <section class="architecture-section" data-testid="production-foundation-status" aria-labelledby="foundation-status-title">
+          <div class="architecture-section-heading"><p class="step-label">仓库真实进度</p><h3 id="foundation-status-title">PostgreSQL 政策持久化、Redis 缓存与 Outbox 已实现</h3><p>这不是页面上的概念图：服务版 Compose 已连接真实 PostgreSQL、Redis，并可用一条命令复跑“迁移 → 种子 → 两次测算 → Redis 命中 → PostgreSQL 审计”的证据链。</p></div>
+          <div class="delivery-grid">
+            <article class="architecture-card"><p class="card-kicker">已实现 · 在线消费</p><h4>已发布政策与计算证据</h4><ol class="flow-list"><li><strong>版本化持久化</strong><span>已发布政策、审核记录、计算审计均写入 PostgreSQL；计算响应携带政策版本和缓存状态。</span></li><li><strong>Redis 精准失效</strong><span>缓存键关联政策版本；发布 Outbox 被消费后，旧版本键失效、新版本键预热。</span></li></ol></article>
+            <article class="architecture-card online-flow"><p class="card-kicker">后续替换 · 离线生产</p><h4>真实政策来源与 AI 草稿尚未实现</h4><ol class="flow-list"><li><strong>当前边界</strong><span>仓库只含城市 A / B 的可审阅示例种子；不抓取政府站点，也不接入 OCR 或模型服务。</span></li><li><strong>下一阶段</strong><span>以受控来源连接器、附件留档、证据定位、人工审核工作台替换演示输入；AI 仍无发布与金额决策权。</span></li></ol></article>
+          </div>
+        </section>
+
+        <section class="architecture-section" aria-labelledby="architecture-flow-title">
+          <div class="architecture-section-heading"><p class="step-label">01 · 生产运行链路</p><h3 id="architecture-flow-title">生产系统的离线与在线数据流</h3><p>离线链路负责生产可信政策，在线链路只消费已发布政策并返回测算结果。</p></div>
+          <div class="delivery-grid">
+            <article class="architecture-card" data-testid="production-offline-card">
+              <p class="card-kicker">后台批处理 · 非用户请求路径</p>
+              <h4>政策生产链路（离线）</h4>
+              <ol class="flow-list"><li><strong>定时获取与原文留档</strong><span>采集官方公告 / 附件，保存来源、文件哈希与原始证据</span></li><li><strong>结构化与人工审核</strong><span>OCR / AI 生成带证据定位的草稿，双人审核规则字段与样例</span></li><li><strong>版本发布与缓存预热</strong><span>审批后的政策版本写入仓库，发布事件使在线缓存精准失效并预热</span></li></ol>
+              <p class="card-footnote">低频、可重试、可回放；失败进入队列或人工工作台，不阻塞任何用户测算。</p>
+            </article>
+            <article class="architecture-card online-flow" data-testid="production-online-card">
+              <p class="card-kicker">高频同步链路 · 面向用户请求</p>
+              <h4>用户测算链路（在线）</h4>
+              <ol class="flow-list"><li><strong>客户端 / 网关</strong><span>接收测算条件，在边界完成鉴权、限流、幂等与参数校验</span></li><li><strong>政策缓存 / 计算用例</strong><span>按地区与版本读取已发布政策，调用确定性规则引擎</span></li><li><strong>结果与异步审计</strong><span>同步返回金额、版本、轨迹和请求 ID；日志指标异步进入队列</span></li></ol>
+              <p class="card-footnote">在线请求不调用模型、不解析原文、不等待写库；浏览器不保存政策比例或结算公式。</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="architecture-section" aria-labelledby="ai-boundary-title">
+          <div class="architecture-section-heading"><p class="step-label">02 · 人机边界</p><h3 id="ai-boundary-title">AI 的能力边界</h3><p>AI 的价值在于降低政策录入与变更识别成本；金额结果必须来自可复现的规则代码和已审批版本。</p></div>
+          <div class="boundary-grid">
+            <article class="boundary-card allowed"><p class="card-kicker">允许辅助</p><h4>AI 可以辅助的环节</h4><ul><li>OCR 识别政策附件并定位原文证据</li><li>提取起付线、比例、封顶线等候选字段</li><li>标出新旧政策版本的条款差异</li><li>生成待审核草稿与测试建议</li></ul></article>
+            <article class="boundary-card prohibited"><p class="card-kicker">绝对禁止</p><h4>AI 不得参与的环节</h4><ul><li>根据语义直接计算或修改报销金额</li><li>自动发布、回滚或覆盖已生效政策</li><li>在规则冲突时自行裁决适用口径</li><li>把真实个人医疗数据作为提示词内容</li></ul><p>原因：模型输出具有概率性；医保结算需要确定性、可追溯、可审核，并符合最小数据暴露原则。</p></article>
+          </div>
+        </section>
+
+        <section class="architecture-section" aria-labelledby="policy-pipeline-title">
+          <div class="architecture-section-heading"><p class="step-label">03 · 政策治理</p><h3 id="policy-pipeline-title">政策数据如何获取、结构化、更新与发布</h3><p>政策本身是受治理的版本化资产，而不是由页面或模型临时“猜出”的参数。</p></div>
+          <ol class="policy-pipeline">
+            <li><strong>官方来源接入</strong><span>官网公告、公开附件或人工受控录入；记录来源 URL、抓取时间与文件哈希。</span></li>
+            <li><strong>原文留档</strong><span>对象存储保存原始文件，保留可追溯证据，不直接覆盖历史版本。</span></li>
+            <li><strong>结构化候选</strong><span>OCR / AI 提取规则字段，同时保存页码、段落等证据定位。</span></li>
+            <li><strong>双人审核</strong><span>业务审核与技术审核核对来源、字段、边界样例和生效日期。</span></li>
+            <li><strong>版本化发布</strong><span>审批 ID、版本号、生效窗口和回滚版本一并写入；只有审批通过的草稿可发布。</span></li>
+            <li><strong>事件驱动生效</strong><span>发布事件使缓存失效并预热新版本；异常可切回上一已批准版本。</span></li>
+          </ol>
+        </section>
+
+        <div class="architecture-two-column">
+          <section class="architecture-section compact" aria-labelledby="scale-title">
+            <div class="architecture-section-heading"><p class="step-label">04 · 容量设计</p><h3 id="scale-title">千万日活：性能与成本</h3><p>评测容量假设：1,000 万 DAU × 人均 2 次测算/日，若 10% 集中到峰值小时并预留 3 倍余量，按约 1,700 RPS 设计；上线后再用真实曲线校准。</p></div>
+            <div class="scale-grid">
+              <article><strong>无状态计算服务</strong><span>API 可按 CPU / RPS 横向扩缩；计算只读已发布政策。</span></article>
+              <article><strong>缓存优先读取</strong><span>Redis 按地区与政策版本缓存，发布事件精准失效并热点预热。</span></article>
+              <article><strong>异步写入审计</strong><span>请求日志、指标与政策处理走队列，避免写库阻塞测算主链路。</span></article>
+              <article><strong>LLM 不在请求路径</strong><span>AI 只在低频政策处理使用，令高频测算成本可预测、可压缩。</span></article>
+            </div>
+          </section>
+
+          <section class="architecture-section compact" aria-labelledby="correctness-title">
+            <div class="architecture-section-heading"><p class="step-label">05 · 正确性</p><h3 id="correctness-title">如何证明算得对</h3><p>不是仅看一笔结果“看起来合理”，而是让每个政策版本、每条规则与每次计算都能被复算和追责。</p></div>
+            <div class="verification-list">
+              <article><strong>固定样例回归</strong><span>每个已发布版本有经人工复核的黄金结算单；版本变更必须全量比对。</span></article>
+              <article><strong>边界与性质测试</strong><span>覆盖 0 元、起付线、封顶线、异地未备案等边界；校验“报销 + 自费 = 总费用”。</span></article>
+              <article><strong>双轨灰度核对</strong><span>新规则先镜像计算，与现网批准版本和人工复算结果比较，异常不放量。</span></article>
+              <article><strong>可追溯与回滚</strong><span>结果携带政策版本、计算轨迹和请求 ID；异常分布触发告警，可回滚政策版本。</span></article>
+            </div>
+          </section>
+        </div>
+
+        <div class="replacement-note"><strong>当前替换进度：</strong>Compose 服务版已使用 PostgreSQL、Redis 与发布 Outbox；离线 H5 仍只读打包快照。下一阶段只替换真实来源接入、附件留档和受控 AI 草稿，应用用例、API 契约和确定性规则引擎保持不变。</div>
       </section>
     </main>
     <script src="./app.js"></script>
