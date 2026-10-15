@@ -1,5 +1,5 @@
-import { randomUUID } from "node:crypto";
-import { PolicyPublisher } from "../../../packages/application/src/publish-policy.js";
+import { createHash, randomUUID } from "node:crypto";
+import { PolicyPublisher, type PolicyDraftCandidate } from "../../../packages/application/src/publish-policy.js";
 import {
   PolicyReviewWorkflow,
   type OperatorIdentity,
@@ -52,10 +52,7 @@ export function localSessionCookie(session: LocalAdminSession): string {
   return `${adminSessionCookie}=${session}; Path=/; HttpOnly; SameSite=Lax; Max-Age=28800`;
 }
 
-export function createComposeAcceptanceDraftInput(version: ComposeAcceptancePolicyVersion): {
-  readonly source: { readonly sourceId: string; readonly region: string; readonly sourceUrl: string };
-  readonly policy: PublishedPolicy;
-} {
+export function createComposeAcceptanceDraftInput(version: ComposeAcceptancePolicyVersion): PolicyDraftCandidate {
   const region = "Compose验收市";
   const draftToken = randomUUID().slice(0, 8);
   const policy: PublishedPolicy = {
@@ -75,13 +72,25 @@ export function createComposeAcceptanceDraftInput(version: ComposeAcceptancePoli
     unfiledOutOfAreaReductionBps: 0,
     catastrophicTiers: [],
   };
+  const capturedAt = new Date().toISOString();
+  const rawDocument = JSON.stringify({ template: `compose-review-console-${version}`, policy });
   return {
     source: {
       sourceId: randomUUID(),
       region,
       sourceUrl: `https://example.test/compose-review-console/${version}`,
+      capturedAt,
+      artifact: {
+        fileName: `compose-review-console-${version}.json`,
+        format: "json",
+        sha256: createHash("sha256").update(rawDocument).digest("hex"),
+        byteLength: Buffer.byteLength(rawDocument),
+      },
     },
     policy,
+    evidence: [],
+    extraction: { method: "demo_static", adapterVersion: "1.0.0", aiAssisted: false },
+    demoAIProposal: true,
   };
 }
 

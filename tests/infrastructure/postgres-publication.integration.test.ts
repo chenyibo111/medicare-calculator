@@ -16,7 +16,7 @@ integration("PostgreSQL 政策发布事务", () => {
       id: randomUUID(),
       status: "approved" as const,
       demoAIProposal: true as const,
-      source: { sourceId: randomUUID(), region: "事务测试市", sourceUrl: "https://example.test/transaction" },
+      source: { sourceId: randomUUID(), region: "事务测试市", sourceUrl: "https://example.test/transaction", capturedAt: "2026-03-01T00:00:00.000Z", artifact: { fileName: "transaction-test.json", format: "json" as const, sha256: randomUUID().replaceAll("-", "").padEnd(64, "0"), byteLength: 256 } },
       policy: {
         region: "事务测试市",
         benefitPlan: "居民医保" as const,
@@ -34,13 +34,15 @@ integration("PostgreSQL 政策发布事务", () => {
         unfiledOutOfAreaReductionBps: 0,
         catastrophicTiers: [],
       },
+      evidence: [],
+      extraction: { method: "demo_static" as const, adapterVersion: "test-1.0.0", aiAssisted: false },
       approvalId: randomUUID(),
       reviewer: "transaction-reviewer",
       approvedAt: "2026-03-01T00:00:00.000Z",
     };
 
     try {
-      await reviewStore.createDraft({ id: draft.id, source: draft.source, policy: draft.policy, createdAt: draft.approvedAt });
+      await reviewStore.createDraft({ id: draft.id, source: draft.source, policy: draft.policy, evidence: draft.evidence, extraction: draft.extraction, createdAt: draft.approvedAt });
       await reviewStore.submitDraft({ draftId: draft.id, submittedBy: "transaction-author", submittedAt: draft.approvedAt });
       await reviewStore.decideDraft({
         draftId: draft.id,
@@ -93,7 +95,7 @@ integration("PostgreSQL 政策发布事务", () => {
       id: randomUUID(),
       status: "approved" as const,
       demoAIProposal: true as const,
-      source: { sourceId: randomUUID(), region, sourceUrl: `https://example.test/${version}` },
+      source: { sourceId: randomUUID(), region, sourceUrl: `https://example.test/${version}`, capturedAt: "2026-03-01T00:00:00.000Z", artifact: { fileName: `${version}.json`, format: "json" as const, sha256: randomUUID().replaceAll("-", "").padEnd(64, "0"), byteLength: 256 } },
       policy: {
         region,
         benefitPlan: "居民医保" as const,
@@ -111,13 +113,15 @@ integration("PostgreSQL 政策发布事务", () => {
         unfiledOutOfAreaReductionBps: 0,
         catastrophicTiers: [],
       },
+      evidence: [],
+      extraction: { method: "demo_static" as const, adapterVersion: "test-1.0.0", aiAssisted: false },
       approvalId: randomUUID(),
       reviewer: "version-reviewer",
       approvedAt: "2026-03-01T00:00:00.000Z",
     });
     const publish = async (version: string) => {
       const draft = createDraft(version);
-      await reviewStore.createDraft({ id: draft.id, source: draft.source, policy: draft.policy, createdAt: draft.approvedAt });
+      await reviewStore.createDraft({ id: draft.id, source: draft.source, policy: draft.policy, evidence: draft.evidence, extraction: draft.extraction, createdAt: draft.approvedAt });
       await reviewStore.submitDraft({ draftId: draft.id, submittedBy: "version-author", submittedAt: draft.approvedAt });
       await reviewStore.decideDraft({
         draftId: draft.id,

@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PolicyPublisher } from "../../packages/application/src/publish-policy.js";
@@ -28,11 +28,20 @@ export async function publishComposeAcceptancePolicy(dependencies: {
     return { version: policy.version, created: false };
   }
 
+  const rawDocument = JSON.stringify({ template: `compose-acceptance-${dependencies.version}`, policy });
   const draft = await dependencies.workflow.createDraft(acceptanceAuthor, {
+      source: {
       sourceId: randomUUID(),
       region: COMPOSE_ACCEPTANCE_REGION,
       sourceUrl: `https://example.test/compose-acceptance/${dependencies.version}`,
-    }, policy);
+      capturedAt: (dependencies.now ?? (() => new Date().toISOString()))(),
+      artifact: { fileName: `compose-acceptance-${dependencies.version}.json`, format: "json", sha256: createHash("sha256").update(rawDocument).digest("hex"), byteLength: Buffer.byteLength(rawDocument) },
+    },
+    policy,
+    evidence: [],
+    extraction: { method: "demo_static", adapterVersion: "1.0.0", aiAssisted: false },
+    demoAIProposal: true,
+  });
   await dependencies.workflow.submitDraft(acceptanceAuthor, draft.id);
   await dependencies.workflow.decideDraft(acceptanceReviewer, draft.id, "approved", "系统 Compose 验收审核通过");
   await dependencies.workflow.publishDraft(acceptanceReviewer, draft.id);
