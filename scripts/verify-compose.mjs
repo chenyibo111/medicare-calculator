@@ -35,11 +35,11 @@ try {
 try {
   await compose(["up", "--build", "-d"]);
   await run(process.execPath, ["scripts/compose-smoke.mjs"]);
-  console.info("Compose 验收通过：迁移、种子、Redis 命中与 PostgreSQL 审计均已验证。");
+  console.info("Compose 验收通过：政策发布、Outbox Worker、版本切换、Redis 缓存与 PostgreSQL 审计均已验证。");
 } catch (error) {
   try {
-    const logs = await compose(["logs", "--tail", "120"]);
-    console.error(`Compose 验收失败，最近服务日志：\n${logs}`);
+    const logs = await compose(["logs", "--tail", "120", "service-web", "policy-worker"]);
+    console.error(`Compose 验收失败，最近 Web 与 Worker 日志：\n${logs}`);
   } catch {
     console.error("Compose 验收失败，且无法读取服务日志。");
   }

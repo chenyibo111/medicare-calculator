@@ -10,16 +10,20 @@ export interface StoredOutboxEvent {
 export class PostgresOutboxDispatcher {
   constructor(private readonly database: PostgresSqlExecutor) {}
 
-  async processNext(deliver: (event: StoredOutboxEvent) => Promise<void>): Promise<boolean> {
+  async processNext(
+    deliver: (event: StoredOutboxEvent) => Promise<void>,
+    options: { readonly eventId?: string } = {},
+  ): Promise<boolean> {
     return this.database.transaction(async (executor) => {
       const result = await executor.query(`
         SELECT id, event_type, aggregate_id, payload
         FROM policy_outbox_events
         WHERE processed_at IS NULL
+          AND ($1::uuid IS NULL OR id = $1::uuid)
         ORDER BY created_at, id
         FOR UPDATE SKIP LOCKED
         LIMIT 1
-      `);
+      `, [options.eventId ?? null]);
       const row = result.rows[0];
       if (!row || typeof row.id !== "string" || typeof row.event_type !== "string" || typeof row.aggregate_id !== "string") {
         return false;

@@ -35,12 +35,13 @@ export class PolicyPublicationDispatcher {
 
         const today = (this.dependencies.today ?? (() => new Date().toISOString().slice(0, 10)))();
         const calculationDate = effectiveFrom > today ? effectiveFrom : today;
-        const key = `policy:v1:${region}:${benefitPlan}:${calculationDate}`;
+        const employmentStatus = benefitPlan === "居民医保" ? "resident" : "employed";
+        const key = `${region}:${employmentStatus}:${calculationDate}`;
         await this.dependencies.cache.getOrLoad(key, async (): Promise<PublishedPolicy> => {
           const policy = await this.dependencies.repository.findPublished({
             region,
             hospitalLevel: "community",
-            employmentStatus: benefitPlan === "居民医保" ? "resident" : "employed",
+            employmentStatus,
             calculationDate,
           });
           if (policy === null) throw new Error(`无法预热政策版本：${event.id}`);

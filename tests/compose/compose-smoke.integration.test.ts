@@ -23,7 +23,14 @@ describe("Compose 可复跑验收入口", () => {
     expect(verifier).toContain('"stop"');
     expect(verifier).not.toContain('"down", "--volumes"');
     expect(verifier).toContain('await run(process.execPath, ["scripts/compose-smoke.mjs"]);');
-    expect(smoke).toContain("cacheStatus");
+    expect(verifier).toContain('"policy-worker"');
+    expect(smoke).toContain("compose:publish-acceptance-policy");
+    expect(smoke).toContain("policy_outbox_events");
+    expect(smoke).toContain("processed_at");
+    expect(smoke).toContain("policyVersion");
+    expect(smoke).toContain("policy:version:compose-e2e-v1:keys");
+    expect(smoke).toContain("miss");
+    expect(smoke).toContain("hit");
     expect(smoke).toContain("calculation_audit_events");
   });
 });

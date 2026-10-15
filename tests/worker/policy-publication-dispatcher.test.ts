@@ -40,7 +40,7 @@ describe("PolicyPublicationDispatcher", () => {
 
     await expect(dispatcher.processNext()).resolves.toBe(true);
     expect(invalidated).toEqual(["A-2026.01"]);
-    expect(cacheKeys).toEqual(["policy:v1:城市A:职工医保:2026-12-01"]);
+    expect(cacheKeys).toEqual(["城市A:employed:2026-12-01"]);
   });
 
   it("处理完成时把 Outbox 事件交给运行日志观察器", async () => {
