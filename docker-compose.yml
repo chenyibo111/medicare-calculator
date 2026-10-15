@@ -50,6 +50,22 @@ services:
       redis:
         condition: service_healthy
 
+  policy-worker:
+    build:
+      context: .
+      dockerfile: apps/service-web/Dockerfile
+    restart: unless-stopped
+    command: ["pnpm", "run", "worker:outbox"]
+    environment:
+      MEDICARE_RUNTIME: compose
+      DATABASE_URL: postgres://${POSTGRES_USER:-medicare_app}:${POSTGRES_PASSWORD:?请先复制 .env.example 为 .env 并设置 POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-medicare_demo}
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
 volumes:
   medicare_postgres_data:
   medicare_redis_data:

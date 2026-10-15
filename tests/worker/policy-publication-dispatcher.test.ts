@@ -75,4 +75,37 @@ describe("PolicyPublicationDispatcher", () => {
 
     expect(observed).toEqual([{ id: "event-log-1", outcome: "processed" }]);
   });
+
+  it("首个发布事件没有旧版本时不会执行失效", async () => {
+    const invalidated: string[] = [];
+    const dispatcher = new PolicyPublicationDispatcher({
+      outbox: {
+        async processNext(deliver: (event: StoredOutboxEvent) => Promise<void>) {
+          await deliver({
+            id: "event-first-version",
+            eventType: "policy.published",
+            aggregateId: "policy-first-version",
+            payload: {
+              region: "城市A",
+              benefitPlan: "职工医保",
+              effectiveFrom: "2026-10-15",
+              previousPolicyVersion: null,
+            },
+          });
+          return true;
+        },
+      } as never,
+      cache: {
+        async invalidateByPolicyVersion(version) { invalidated.push(version); },
+        async getOrLoad(_key, loader) { return { value: await loader(), status: "miss" as const }; },
+      },
+      repository: {
+        async findPublished() { return { version: "A-2026.01" } as never; },
+      },
+    });
+
+    await dispatcher.processNext();
+
+    expect(invalidated).toEqual([]);
+  });
 });

@@ -36,12 +36,15 @@ describe("Compose 运行契约", () => {
           depends_on?: Record<string, { condition?: string }>;
           environment?: Record<string, string>;
           healthcheck?: unknown;
+          restart?: string;
+          command?: string[];
         }
       >;
       volumes?: Record<string, unknown>;
     };
 
     expect(Object.keys(config.services).sort()).toEqual([
+      "policy-worker",
       "postgres",
       "redis",
       "service-web",
@@ -58,6 +61,19 @@ describe("Compose 运行契约", () => {
       MEDICARE_RUNTIME: "compose",
       DATABASE_URL: expect.stringContaining("postgres://"),
       REDIS_URL: expect.stringContaining("redis://"),
+    });
+    expect(config.services["policy-worker"]).toMatchObject({
+      restart: "unless-stopped",
+      command: ["pnpm", "run", "worker:outbox"],
+      depends_on: {
+        postgres: { condition: "service_healthy" },
+        redis: { condition: "service_healthy" },
+      },
+      environment: {
+        MEDICARE_RUNTIME: "compose",
+        DATABASE_URL: expect.stringContaining("postgres://"),
+        REDIS_URL: expect.stringContaining("redis://"),
+      },
     });
     expect(config.volumes).toMatchObject({
       medicare_postgres_data: {},

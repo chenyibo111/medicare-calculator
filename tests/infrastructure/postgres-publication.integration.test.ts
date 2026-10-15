@@ -69,4 +69,83 @@ integration("PostgreSQL 政策发布事务", () => {
       await executor.close();
     }
   });
+
+  it("发布重叠新版本时把真实旧版本写入 Outbox 并废弃旧版本", async () => {
+    const executor = createPostgresSqlExecutor(process.env.DATABASE_URL!);
+    const store = new PostgresPolicyPublicationStore(executor);
+    const region = `版本切换测试市-${randomUUID()}`;
+    const v1 = `V1-${randomUUID()}`;
+    const v2 = `V2-${randomUUID()}`;
+    const createDraft = (version: string) => ({
+      id: randomUUID(),
+      status: "approved" as const,
+      demoAIProposal: true as const,
+      source: { sourceId: randomUUID(), region, sourceUrl: `https://example.test/${version}` },
+      policy: {
+        region,
+        benefitPlan: "居民医保" as const,
+        version,
+        effectiveFrom: "2026-04-01",
+        sourceReference: "版本切换测试来源",
+        hospitalRules: {
+          community: { deductibleFen: 100, reimbursementRateBps: 8500 },
+          secondary: { deductibleFen: 200, reimbursementRateBps: 7500 },
+          tertiary: { deductibleFen: 300, reimbursementRateBps: 6500 },
+        },
+        classBAdvanceRateBps: 0,
+        annualCapFen: 1_000_000,
+        retirementBonusBps: 0,
+        unfiledOutOfAreaReductionBps: 0,
+        catastrophicTiers: [],
+      },
+      approvalId: randomUUID(),
+      reviewer: "version-reviewer",
+      approvedAt: "2026-03-01T00:00:00.000Z",
+    });
+    const publish = async (version: string) => {
+      const draft = createDraft(version);
+      await store.publishApprovedVersion({
+        approvedDraft: draft,
+        publication: {
+          policy: { ...draft.policy, status: "published" },
+          event: {
+            eventType: "policy.published",
+            region,
+            benefitPlan: "居民医保",
+            newPolicyVersion: version,
+            previousPolicyVersion: null,
+            effectiveFrom: "2026-04-01",
+            effectiveTo: null,
+          },
+        },
+      });
+    };
+
+    try {
+      await publish(v1);
+      await publish(v2);
+
+      const versions = await executor.query(
+        "SELECT version, status FROM policy_versions WHERE region = $1 ORDER BY version",
+        [region],
+      );
+      const event = await executor.query(
+        "SELECT payload->>'previousPolicyVersion' AS previous_policy_version FROM policy_outbox_events WHERE payload->>'newPolicyVersion' = $1",
+        [v2],
+      );
+
+      expect(versions.rows).toEqual([
+        { version: v1, status: "superseded" },
+        { version: v2, status: "published" },
+      ]);
+      expect(event.rows).toEqual([{ previous_policy_version: v1 }]);
+    } finally {
+      await executor.query("DELETE FROM policy_outbox_events WHERE payload->>'region' = $1", [region]);
+      await executor.query("DELETE FROM policy_reviews WHERE draft_id IN (SELECT id FROM policy_drafts WHERE source_id IN (SELECT id FROM policy_sources WHERE region = $1))", [region]);
+      await executor.query("DELETE FROM policy_drafts WHERE source_id IN (SELECT id FROM policy_sources WHERE region = $1)", [region]);
+      await executor.query("DELETE FROM policy_versions WHERE region = $1", [region]);
+      await executor.query("DELETE FROM policy_sources WHERE region = $1", [region]);
+      await executor.close();
+    }
+  });
 });
