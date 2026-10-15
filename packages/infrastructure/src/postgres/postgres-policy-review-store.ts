@@ -1,7 +1,9 @@
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import type {
   ApprovedPolicyDraft,
   PendingPolicyDraft,
+  PolicyEvidence,
+  PolicyExtractionMetadata,
   PolicyReviewGateway,
 } from "../../../application/src/publish-policy.js";
 import type {
@@ -13,14 +15,16 @@ import type { PublishedPolicy } from "../../../domain/src/policy.js";
 import type { PostgresSqlExecutor } from "./client.js";
 import type { SqlExecutor, SqlQueryResult } from "./migration-runner.js";
 
-function contentHash(value: unknown): string {
-  return createHash("sha256").update(JSON.stringify(value)).digest("hex");
-}
-
 function asRecord(value: unknown): Record<string, unknown> {
   if (typeof value === "object" && value !== null) return value as Record<string, unknown>;
   if (typeof value === "string") return JSON.parse(value) as Record<string, unknown>;
   throw new Error("政策审核数据格式无效");
+}
+
+function asArray(value: unknown): unknown[] {
+  const parsed = typeof value === "string" ? JSON.parse(value) : value;
+  if (!Array.isArray(parsed)) throw new Error("政策审核证据格式无效");
+  return parsed;
 }
 
 function readString(row: Record<string, unknown>, key: string): string {
@@ -32,6 +36,24 @@ function readString(row: Record<string, unknown>, key: string): string {
 function readNullableString(row: Record<string, unknown>, key: string): string | null {
   const value = row[key];
   return typeof value === "string" ? value : null;
+}
+
+function readIsoTimestamp(row: Record<string, unknown>, key: string): string {
+  const value = readString(row, key);
+  const timestamp = new Date(value);
+  if (Number.isNaN(timestamp.getTime())) throw new Error(`政策审核数据中的 ${key} 不是有效时间`);
+  return timestamp.toISOString();
+}
+
+function mapExtraction(value: unknown): PolicyExtractionMetadata {
+  const extraction = asRecord(value);
+  const method = extraction.method;
+  const adapterVersion = extraction.adapterVersion;
+  const aiAssisted = extraction.aiAssisted;
+  if (!(method === "demo_static" || method === "deterministic_json" || method === "ocr_llm") || typeof adapterVersion !== "string" || typeof aiAssisted !== "boolean") {
+    throw new Error("政策审核提取元数据无效");
+  }
+  return { method, adapterVersion, aiAssisted };
 }
 
 function mapDraft(result: SqlQueryResult): PolicyReviewDraft | null {
@@ -49,16 +71,26 @@ function mapDraft(result: SqlQueryResult): PolicyReviewDraft | null {
     reason: readNullableString(row, "review_reason"),
     reviewedAt: readString(row, "reviewed_at"),
   };
+  const extraction = mapExtraction(row.extraction);
   return {
     id: readString(row, "id"),
     status: status as PolicyReviewDraft["status"],
-    demoAIProposal: true,
+    ...(extraction.method === "demo_static" ? { demoAIProposal: true as const } : {}),
     source: {
       sourceId: readString(row, "source_id"),
       region: readString(row, "region"),
       sourceUrl: readString(row, "source_url"),
+      capturedAt: readIsoTimestamp(row, "captured_at"),
+      artifact: {
+        fileName: readString(row, "artifact_file_name"),
+        format: "json",
+        sha256: readString(row, "content_hash"),
+        byteLength: Number(row.artifact_byte_length),
+      },
     },
     policy: asRecord(row.policy_payload) as unknown as PublishedPolicy,
+    evidence: asArray(row.evidence) as PolicyEvidence[],
+    extraction,
     submittedBy: readNullableString(row, "submitted_by"),
     submittedAt: readNullableString(row, "submitted_at"),
     review,
@@ -68,8 +100,8 @@ function mapDraft(result: SqlQueryResult): PolicyReviewDraft | null {
 async function fetchDraft(executor: SqlExecutor, draftId: string, forUpdate = false): Promise<PolicyReviewDraft | null> {
   const lock = forUpdate ? " FOR UPDATE OF d" : "";
   const result = await executor.query(
-    `SELECT d.id::text, d.status, d.submitted_by, d.submitted_at::text, d.policy_payload, d.evidence,
-            s.id::text AS source_id, s.region, s.source_url,
+    `SELECT d.id::text, d.status, d.submitted_by, d.submitted_at::text, d.policy_payload, d.evidence, d.extraction,
+            s.id::text AS source_id, s.region, s.source_url, s.captured_at::text, s.content_hash, s.artifact_file_name, s.artifact_format, s.artifact_byte_length,
             r.id::text AS review_id, r.reviewer_id, r.decision, r.review_reason, r.reviewed_at::text
      FROM policy_drafts d
      JOIN policy_sources s ON s.id = d.source_id
@@ -93,6 +125,8 @@ export async function loadApprovedPolicyDraft(
     demoAIProposal: draft.demoAIProposal,
     source: draft.source,
     policy: draft.policy,
+    evidence: draft.evidence,
+    extraction: draft.extraction,
     approvalId: draft.review.id,
     reviewer: draft.review.reviewerId,
     approvedAt: draft.review.reviewedAt,
@@ -105,14 +139,22 @@ export class PostgresPolicyReviewStore implements PolicyReviewStore, PolicyRevie
   async createDraft(input: Parameters<PolicyReviewStore["createDraft"]>[0]): Promise<PolicyReviewDraft> {
     await this.database.transaction(async (executor) => {
       await executor.query(
-        `INSERT INTO policy_sources (id, region, source_url, content_hash, captured_at)
-         VALUES ($1::uuid, $2, $3, $4, $5::timestamptz)`,
-        [input.source.sourceId, input.source.region, input.source.sourceUrl, contentHash(input.source), input.createdAt],
+        `INSERT INTO policy_sources (
+           id, region, source_url, content_hash, captured_at, artifact_file_name, artifact_format, artifact_byte_length
+         ) VALUES ($1::uuid, $2, $3, $4, $5::timestamptz, $6, $7, $8)
+         ON CONFLICT (content_hash) DO NOTHING
+         RETURNING id`,
+        [input.source.sourceId, input.source.region, input.source.sourceUrl, input.source.artifact.sha256, input.source.capturedAt, input.source.artifact.fileName, input.source.artifact.format, input.source.artifact.byteLength],
       );
+      const source = await executor.query(
+        "SELECT id FROM policy_sources WHERE id = $1::uuid",
+        [input.source.sourceId],
+      );
+      if (source.rows.length === 0) throw new Error("该政策源内容已导入");
       await executor.query(
-        `INSERT INTO policy_drafts (id, source_id, policy_payload, evidence, status)
-         VALUES ($1::uuid, $2::uuid, $3::jsonb, $4::jsonb, 'draft')`,
-        [input.id, input.source.sourceId, JSON.stringify(input.policy), JSON.stringify({ demoAIProposal: true })],
+        `INSERT INTO policy_drafts (id, source_id, policy_payload, evidence, extraction, status)
+         VALUES ($1::uuid, $2::uuid, $3::jsonb, $4::jsonb, $5::jsonb, 'draft')`,
+        [input.id, input.source.sourceId, JSON.stringify(input.policy), JSON.stringify(input.evidence), JSON.stringify(input.extraction)],
       );
     });
     const draft = await this.getDraft(input.id);
@@ -126,8 +168,8 @@ export class PostgresPolicyReviewStore implements PolicyReviewStore, PolicyRevie
 
   async listDrafts(): Promise<readonly PolicyReviewDraft[]> {
     const result = await this.database.query(
-      `SELECT d.id::text, d.status, d.submitted_by, d.submitted_at::text, d.policy_payload, d.evidence,
-              s.id::text AS source_id, s.region, s.source_url,
+      `SELECT d.id::text, d.status, d.submitted_by, d.submitted_at::text, d.policy_payload, d.evidence, d.extraction,
+              s.id::text AS source_id, s.region, s.source_url, s.captured_at::text, s.content_hash, s.artifact_file_name, s.artifact_format, s.artifact_byte_length,
               r.id::text AS review_id, r.reviewer_id, r.decision, r.review_reason, r.reviewed_at::text
        FROM policy_drafts d
        JOIN policy_sources s ON s.id = d.source_id

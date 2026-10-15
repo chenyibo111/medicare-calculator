@@ -48,7 +48,11 @@ describe("MigrationRunner", () => {
     const executor = new RecordingExecutor();
     const runner = new MigrationRunner(executor, resolve("db/migrations"));
 
-    await expect(runner.migrate()).resolves.toEqual(["001_policy_foundation.sql", "002_policy_review_console.sql"]);
+    await expect(runner.migrate()).resolves.toEqual([
+      "001_policy_foundation.sql",
+      "002_policy_review_console.sql",
+      "003_policy_source_artifact.sql",
+    ]);
   });
 
   it("按文件名顺序仅执行尚未记录的 SQL 迁移", async () => {

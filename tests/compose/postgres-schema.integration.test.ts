@@ -45,6 +45,15 @@ integration("PostgreSQL 政策基础 schema", () => {
         expect.arrayContaining(["submitted_by", "submitted_at"]),
       );
 
+      const sourceColumns = await executor.query(`
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'policy_sources'
+      `);
+      expect(sourceColumns.rows.map((row) => row.column_name)).toEqual(
+        expect.arrayContaining(["artifact_file_name", "artifact_format", "artifact_byte_length"]),
+      );
+
       const demoPolicies = await executor.query(`
         SELECT region, version, benefit_plan, status
         FROM policy_versions
