@@ -59,9 +59,11 @@ describe("Compose 运行契约", () => {
     });
     expect(config.services["service-web"].environment).toMatchObject({
       MEDICARE_RUNTIME: "compose",
+      MEDICARE_ADMIN_CONSOLE: "false",
       DATABASE_URL: expect.stringContaining("postgres://"),
       REDIS_URL: expect.stringContaining("redis://"),
     });
+    expect(config.services["policy-worker"].environment).not.toHaveProperty("MEDICARE_ADMIN_CONSOLE");
     expect(config.services["policy-worker"]).toMatchObject({
       restart: "unless-stopped",
       command: ["pnpm", "run", "worker:outbox"],

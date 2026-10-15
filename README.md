@@ -56,6 +56,8 @@ docker compose --env-file .env exec -T policy-worker pnpm run compose:publish-ac
 
 要在页面直接演示版本切换：依次发布 v1 或 v2 后，打开 `http://localhost:3010`，点击“填入 Compose 验收样例”再开始测算；结算单的“政策版本”将显示 `compose-e2e-v1` 或 `compose-e2e-v2`。该按钮只填入固定测算条件，不提供浏览器端发布能力。
 
+要演示持久化审核与发布闭环，在 `.env` 增加 `MEDICARE_ADMIN_CONSOLE=true` 后重新执行 `docker compose --env-file .env up --build -d`，再访问 `http://localhost:3010/admin/policy-review`。后台提供固定的本地录入员/审核员身份，草稿必须经历“创建 → 提交 → 异人批准 → 发布”；它不是生产登录。生产通过 `OperatorIdentityProvider` 替换为企业 SSO/OAuth，用户测算页不会出现后台链接。
+
 ### 4. 政策处理演示
 
 ```powershell
@@ -111,7 +113,7 @@ pnpm exec playwright test --project=service
 | 文件政策仓库（快速测试） | PostgreSQL 版本化仓库（Compose 已实现） | `PolicyRepository` |
 | 进程内 TTL（快速测试） | Redis / 事件驱动失效 / 热点预热（Compose 已实现） | `PolicyCache` |
 | Next 单进程 API | 无状态计算服务、网关、限流与扩缩 | DTO 与 `CalculateReimbursementUseCase` |
-| Compose 常驻 `policy-worker` + 本地验收 CLI | 队列、重试、死信和审批工作台 | 发布门禁与审计事件 |
+| Compose 常驻 `policy-worker` + 本地验收 CLI + 持久化本地评测后台 | 队列、重试、死信、企业 SSO/OAuth 与审批工作台 | 发布门禁、`OperatorIdentityProvider` 与审计事件 |
 
 已实现与后续替换矩阵见 [Compose 生产化基础](docs/production-foundation.md)；生产架构、AI 边界、缓存策略、正确性校验与性能方案见 [架构说明](docs/architecture.md)。
 

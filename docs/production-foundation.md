@@ -20,7 +20,7 @@ POST /api/v1/reimbursement-calculations
 
 评测发布 CLI 也以 `地区 + 险种 + 版本` 作为幂等键：同一验收版本已入库后，即使状态已经因后续版本变为 `superseded`，再次执行仍只返回 `already_published`，不会再次发布或产生新的 Outbox 事件。
 
-服务版为评测保留“Compose 验收样例”快捷填充。它与 Worker 验收政策使用同一组测算条件；在 CLI 发布 v1 或 v2 后，页面只通过测算 API 显示该次结果实际命中的 `compose-e2e-v1` 或 `compose-e2e-v2`。快捷填充不具备发布权限。
+服务版为评测保留“Compose 验收样例”快捷填充。它与 Worker 验收政策使用同一组测算条件；在 CLI 发布 v1 或 v2 后，页面只通过测算 API 显示该次结果实际命中的 `compose-e2e-v1` 或 `compose-e2e-v2`。快捷填充不具备发布权限。另有仅在 `MEDICARE_ADMIN_CONSOLE=true` 时可访问的 `/admin/policy-review`：固定本地录入员/审核员身份走 PostgreSQL 草稿、异人审核和事务发布；生产以 `OperatorIdentityProvider` 接入企业 SSO/OAuth。
 
 ## 可复跑验收
 
@@ -39,7 +39,7 @@ POST /api/v1/reimbursement-calculations
 | --- | --- | --- |
 | 真实政策获取 | 仅城市 A/B SQL 示例种子 | 官方来源连接器、变更检测、附件对象存储与内容哈希 |
 | AI / OCR | 仅离线 Worker 演示提案 | 模型网关、OCR、证据定位、置信度评测；结果始终进入人工审核 |
-| 审核工作台 | 数据模型、发布事务与本地开发/评测 CLI | RBAC、双人复核、影响分析、回放与回滚 UI |
+| 审核工作台 | PostgreSQL 草稿、禁止自审、固定本地评测身份与发布后台 | 企业 SSO/OAuth、RBAC、双人复核、影响分析、回放与回滚 UI |
 | 高并发运行 | 单机 Compose 的 PostgreSQL / Redis | Redis Cluster、只读副本、无状态 API 多副本、限流与 SLO |
 | 审计保留 | 最小化哈希和执行轨迹 | 不可变事件流、保留策略、告警、访问审计与合规复核 |
 

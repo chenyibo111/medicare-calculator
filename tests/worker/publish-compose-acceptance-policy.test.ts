@@ -43,36 +43,23 @@ describe("Compose 验收政策发布", () => {
 
   it("目标版本不存在时经审核发布，已存在时幂等跳过", async () => {
     const publishedVersions: string[] = [];
-    const publisher = {
-      async publish(draft: { policy: { version: string } }) {
-        publishedVersions.push(draft.policy.version);
-      },
-    };
-    const reviewGateway = {
-      async approve(draft: { id: string; policy: unknown }, reviewer: string) {
-        return {
-          ...draft,
-          status: "approved" as const,
-          approvalId: "approval-acceptance",
-          reviewer,
-          approvedAt: "2026-10-15T00:00:00.000Z",
-        };
-      },
-      async verifyApproved() {},
+    const workflow = {
+      async createDraft(_: unknown, __: unknown, policy: { version: string }) { return { id: "draft-acceptance", policy }; },
+      async submitDraft() {},
+      async decideDraft() {},
+      async publishDraft(_: unknown, __: string) { publishedVersions.push(composeAcceptancePolicy("v1").version); },
     };
 
     const created = await publishComposeAcceptancePolicy({
       version: "v1",
       hasPersistedVersion: async () => false,
-      publisher: publisher as never,
-      reviewGateway: reviewGateway as never,
+      workflow: workflow as never,
       now: () => "2026-10-15T00:00:00.000Z",
     });
     const skipped = await publishComposeAcceptancePolicy({
       version: "v1",
       hasPersistedVersion: async () => true,
-      publisher: publisher as never,
-      reviewGateway: reviewGateway as never,
+      workflow: workflow as never,
       now: () => "2026-10-15T00:00:00.000Z",
     });
 
