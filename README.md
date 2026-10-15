@@ -64,6 +64,8 @@ docker compose --env-file .env exec -T policy-worker pnpm run compose:publish-ac
 pnpm run test:e2e:compose-admin
 ```
 
+PostgreSQL 集成验收还覆盖自审不写审核记录、重复发布不重复写版本/Outbox，以及并发审核至多产生一条有效决定。
+
 ### 4. 政策处理演示
 
 ```powershell

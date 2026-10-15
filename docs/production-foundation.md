@@ -22,6 +22,8 @@ POST /api/v1/reimbursement-calculations
 
 服务版为评测保留“Compose 验收样例”快捷填充。它与 Worker 验收政策使用同一组测算条件；在 CLI 发布 v1 或 v2 后，页面只通过测算 API 显示该次结果实际命中的 `compose-e2e-v1` 或 `compose-e2e-v2`。快捷填充不具备发布权限。另有仅在 `MEDICARE_ADMIN_CONSOLE=true` 时可访问的 `/admin/policy-review`：固定本地录入员/审核员身份走 PostgreSQL 草稿、异人审核和事务发布；生产以 `OperatorIdentityProvider` 接入企业 SSO/OAuth。
 
+审核门禁已在真实 PostgreSQL 中验证：自审不会留下审核记录；重复发布不重复写入政策版本或 Outbox；并发审核同一草稿时至多保留一条有效决定。
+
 ## 可复跑验收
 
 `pnpm run verify:compose` 会：
