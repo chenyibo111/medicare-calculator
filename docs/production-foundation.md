@@ -4,7 +4,7 @@
 
 ## 已实现的闭环
 
-`docker compose up --build` 会启动 PostgreSQL 16、Redis 7 与 Next 服务。服务容器启动时执行原生 SQL 迁移和城市 A/B 示例种子；Compose 运行模式只能创建 PostgreSQL 仓库、Redis 缓存与 PostgreSQL 审计日志，依赖不可用时显式报错，不会回退到文件或内存适配器。
+`docker compose up --build` 会启动 PostgreSQL 16、Redis 7、Next 服务与常驻 `policy-worker`。服务容器启动时执行原生 SQL 迁移和城市 A/B 示例种子；Compose 运行模式只能创建 PostgreSQL 仓库、Redis 缓存与 PostgreSQL 审计日志，依赖不可用时显式报错，不会回退到文件或内存适配器。
 
 一次计算的在线链路为：
 
@@ -24,8 +24,8 @@ POST /api/v1/reimbursement-calculations
 
 1. 检查 Docker Desktop 和本地 `.env`。
 2. 构建并启动本项目 Compose 服务，等待其迁移和种子完成。
-3. 删除仅用于本次演示日期的城市 B 缓存键，连续调用 API 两次。
-4. 断言首次 `cacheStatus=miss`、第二次 `cacheStatus=hit`，并断言预计自费为 `2,366,500` 分。
+3. 在隔离验收地区发布 v1，建立缓存，再发布 v2 并等待 `policy-worker` 写入 `processed_at`。
+4. 断言 API 已从 v1 切换至 v2；删除 v2 的当天缓存后，断言首次 `cacheStatus=miss`、第二次 `cacheStatus=hit`。
 5. 从 PostgreSQL 查到这两次请求对应的 `miss` 与 `hit` 审计记录。
 6. 仅停止本项目容器，保留命名卷；不会执行 `down --volumes`。
 
@@ -35,7 +35,7 @@ POST /api/v1/reimbursement-calculations
 | --- | --- | --- |
 | 真实政策获取 | 仅城市 A/B SQL 示例种子 | 官方来源连接器、变更检测、附件对象存储与内容哈希 |
 | AI / OCR | 仅离线 Worker 演示提案 | 模型网关、OCR、证据定位、置信度评测；结果始终进入人工审核 |
-| 审核工作台 | 数据模型与发布事务 | RBAC、双人复核、影响分析、回放与回滚 UI |
+| 审核工作台 | 数据模型、发布事务与本地开发/评测 CLI | RBAC、双人复核、影响分析、回放与回滚 UI |
 | 高并发运行 | 单机 Compose 的 PostgreSQL / Redis | Redis Cluster、只读副本、无状态 API 多副本、限流与 SLO |
 | 审计保留 | 最小化哈希和执行轨迹 | 不可变事件流、保留策略、告警、访问审计与合规复核 |
 

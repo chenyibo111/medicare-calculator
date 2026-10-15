@@ -2,7 +2,7 @@
 
 一个可用于企业 AI 实践评测的医保住院报销预估产品，提供离线 H5、快速测试服务和 Docker Compose 三条可运行路径。两种页面均只覆盖城市 A / B 的示例住院政策，始终标注“**示例政策，仅供演示**”。
 
-> 不接入真实参保信息、真实医保结算、真实政府站点或真实模型服务。Compose 路径已使用 PostgreSQL 与 Redis，但数据仅为可审阅的示例政策；结果是规则预估，不是医保结算承诺。
+> 不接入真实参保信息、真实医保结算、真实政府站点或真实模型服务。Compose 路径已使用 PostgreSQL、Redis 与 `policy-worker`，但数据仅为可审阅的示例政策；结果是规则预估，不是医保结算承诺。
 
 ## 快速运行
 
@@ -36,7 +36,7 @@ Copy-Item .env.example .env
 docker compose --env-file .env up --build
 ```
 
-访问 `http://localhost:3010`。该路径使用 PostgreSQL 政策仓库与审计日志、Redis 政策缓存；启动时执行迁移和可重复的城市 A/B 示例种子。
+访问 `http://localhost:3010`。该路径使用 PostgreSQL 政策仓库与审计日志、Redis 政策缓存，以及常驻的 `policy-worker`；启动时执行迁移和可重复的城市 A/B 示例种子。
 
 完整的可复跑验收：
 
@@ -44,7 +44,13 @@ docker compose --env-file .env up --build
 pnpm run verify:compose
 ```
 
-该命令验证迁移、种子、一次 Redis miss、一次 Redis hit 和两条 PostgreSQL 审计记录；结束时仅停止本项目容器，保留命名卷。
+该命令会在隔离的“Compose验收市”发布 v1、建立缓存、发布 v2，等待 `policy-worker` 消费 Outbox，断言 API 已切换到 v2；随后清理 v2 缓存并验证一次 Redis miss、一次 hit 及 PostgreSQL 审计记录。结束时仅停止本项目容器，保留命名卷。
+
+本地开发/评测入口（不是生产管理后台）：
+
+```powershell
+docker compose --env-file .env exec -T policy-worker pnpm run compose:publish-acceptance-policy -- --version v1
+```
 
 ### 4. 政策处理演示
 
@@ -71,7 +77,7 @@ pnpm exec playwright test --project=service
 
 1. 打开离线版，点击“填入城市 A 样例”，展示预计自费和可展开的计算明细。
 2. 切换退休身份、医院等级或异地备案，说明 UI 只采集条件，规则由共享引擎决定。
-3. 运行 `pnpm run verify:compose`，展示 PostgreSQL 迁移/种子、Redis 二次命中和审计记录的一键证据。
+3. 运行 `pnpm run verify:compose`，展示 v1 → v2 发布、`policy-worker` 消费 Outbox、API 版本切换、Redis miss/hit 与审计记录的一键证据。
 4. 启动 Compose 服务版，填入城市 B 样例，展示 API 返回的政策版本、请求标识和缓存状态。
 5. 运行 Worker，说明 AI 不具备发布权限，必须经过审核门禁。
 6. 查看离线版“方案设计”中的已实现与待替换边界；服务版只聚焦在线测算。
@@ -86,7 +92,7 @@ pnpm exec playwright test --project=service
 | `packages/contracts` | 请求/响应 DTO 与 Zod 校验 | 服务 API 的兼容边界 |
 | `packages/application` | 计算用例、审核门禁、发布用例、端口定义 | 不依赖文件/缓存/Next |
 | `packages/infrastructure` | 文件/内存测试替身，以及 PostgreSQL、Redis、Outbox、审计适配器 | 真实来源接入仍待替换 |
-| `worker` | 离线政策处理演示与 Outbox 消费入口 | 可替换为队列消费者 |
+| `worker` | 离线政策处理演示、Compose 常驻 Outbox 消费与受控验收发布 CLI | 可替换为队列消费者与审核工作台 |
 | `apps/offline-demo` | 无网络的演示 H5 | 只读快照适配器 |
 | `apps/service-web` | Next.js 页面、API 路由、服务端组合根 | 客户端不导入政策 |
 
@@ -101,7 +107,7 @@ pnpm exec playwright test --project=service
 | 文件政策仓库（快速测试） | PostgreSQL 版本化仓库（Compose 已实现） | `PolicyRepository` |
 | 进程内 TTL（快速测试） | Redis / 事件驱动失效 / 热点预热（Compose 已实现） | `PolicyCache` |
 | Next 单进程 API | 无状态计算服务、网关、限流与扩缩 | DTO 与 `CalculateReimbursementUseCase` |
-| 手动 Worker | 队列、重试、死信和审批工作台 | 发布门禁与审计事件 |
+| Compose 常驻 `policy-worker` + 本地验收 CLI | 队列、重试、死信和审批工作台 | 发布门禁与审计事件 |
 
 已实现与后续替换矩阵见 [Compose 生产化基础](docs/production-foundation.md)；生产架构、AI 边界、缓存策略、正确性校验与性能方案见 [架构说明](docs/architecture.md)。
 

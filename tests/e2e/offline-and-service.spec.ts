@@ -42,7 +42,8 @@ test.describe("离线演示版 @offline", () => {
     await expect(page.getByRole("heading", { name: "生产系统的离线与在线数据流" })).toBeVisible();
     await expect(page.getByTestId("production-offline-card")).toContainText("政策生产链路（离线）");
     await expect(page.getByTestId("production-online-card")).toContainText("用户测算链路（在线）");
-    await expect(page.getByTestId("production-foundation-status")).toContainText("PostgreSQL 政策持久化、Redis 缓存与 Outbox 已实现");
+    await expect(page.getByTestId("production-foundation-status")).toContainText("PostgreSQL 政策持久化、Redis 缓存、Outbox 与 Worker 已实现");
+    await expect(page.getByTestId("production-foundation-status")).toContainText("Worker 已纳入 Compose");
     await expect(page.getByTestId("production-foundation-status")).toContainText("真实政策来源与 AI 草稿尚未实现");
     await expect(page.getByRole("heading", { name: "AI 的能力边界" })).toBeVisible();
     await expect(page.getByText("AI 不得参与的环节")).toBeVisible();

@@ -30,7 +30,7 @@ RawPolicySource
   → PolicyCache.invalidateByPolicyVersion(version)
 ```
 
-`PolicyPublisher` 是唯一发布关口。当前已实现 PostgreSQL 事务发布：旧版本状态、新版本和 `policy.published` Outbox 事件在同一事务写入；Worker 消费后精准失效旧版本 Redis 键并预热新版本。真实来源采集、附件对象存储、OCR/LLM 草稿与审核工作台尚未实现。
+`PolicyPublisher` 是唯一发布关口。当前已实现 PostgreSQL 事务发布：旧版本状态、新版本和 `policy.published` Outbox 事件在同一事务写入；Compose 常驻 `policy-worker` 消费后精准失效旧版本 Redis 键并预热新版本。发布 CLI 仅为本地开发/评测入口，不是公开管理 API。真实来源采集、附件对象存储、OCR/LLM 草稿与审核工作台尚未实现。
 
 ## 正确性策略
 
