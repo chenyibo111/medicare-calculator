@@ -1,6 +1,6 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   MigrationRunner,
@@ -44,6 +44,13 @@ async function createMigrationDirectory(files: Record<string, string>) {
 }
 
 describe("MigrationRunner", () => {
+  it("项目迁移包含审核工作台的生命周期迁移", async () => {
+    const executor = new RecordingExecutor();
+    const runner = new MigrationRunner(executor, resolve("db/migrations"));
+
+    await expect(runner.migrate()).resolves.toEqual(["001_policy_foundation.sql", "002_policy_review_console.sql"]);
+  });
+
   it("按文件名顺序仅执行尚未记录的 SQL 迁移", async () => {
     const directory = await createMigrationDirectory({
       "010_indexes.sql": "CREATE INDEX policy_version_idx ON policy_versions (version);",

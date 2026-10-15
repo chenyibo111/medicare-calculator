@@ -36,6 +36,15 @@ integration("PostgreSQL 政策基础 schema", () => {
       `);
       expect(indexes.rows.map((row) => row.indexname)).toContain("policy_versions_lookup_idx");
 
+      const reviewColumns = await executor.query(`
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'policy_drafts'
+      `);
+      expect(reviewColumns.rows.map((row) => row.column_name)).toEqual(
+        expect.arrayContaining(["submitted_by", "submitted_at"]),
+      );
+
       const demoPolicies = await executor.query(`
         SELECT region, version, benefit_plan, status
         FROM policy_versions
