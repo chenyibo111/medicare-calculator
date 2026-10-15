@@ -5,9 +5,31 @@ import {
   COMPOSE_ACCEPTANCE_REGION,
   composeAcceptancePolicy,
 } from "../../worker/src/compose-policy-fixtures.js";
-import { publishComposeAcceptancePolicy } from "../../worker/src/publish-compose-acceptance-policy.js";
+import {
+  hasPersistedComposeAcceptancePolicyVersion,
+  publishComposeAcceptancePolicy,
+} from "../../worker/src/publish-compose-acceptance-policy.js";
 
 describe("Compose 验收政策发布", () => {
+  it("已被后续版本替代的验收版本仍视为已存在", async () => {
+    const queries: Array<{ text: string; values: readonly unknown[] }> = [];
+    const database = {
+      async query(text: string, values: readonly unknown[]) {
+        queries.push({ text, values });
+        return { rows: [{ exists: true }] };
+      },
+    };
+
+    await expect(hasPersistedComposeAcceptancePolicyVersion(database as never, "compose-e2e-v1")).resolves.toBe(true);
+
+    expect(queries).toEqual([
+      expect.objectContaining({
+        text: expect.not.stringContaining("status = 'published'"),
+        values: [COMPOSE_ACCEPTANCE_REGION, "居民医保", "compose-e2e-v1"],
+      }),
+    ]);
+  });
+
   it("使用独立于城市 A/B 的可匹配验收政策", () => {
     const v1 = composeAcceptancePolicy("v1");
     const v2 = composeAcceptancePolicy("v2");
@@ -41,14 +63,14 @@ describe("Compose 验收政策发布", () => {
 
     const created = await publishComposeAcceptancePolicy({
       version: "v1",
-      hasPublishedVersion: async () => false,
+      hasPersistedVersion: async () => false,
       publisher: publisher as never,
       reviewGateway: reviewGateway as never,
       now: () => "2026-10-15T00:00:00.000Z",
     });
     const skipped = await publishComposeAcceptancePolicy({
       version: "v1",
-      hasPublishedVersion: async () => true,
+      hasPersistedVersion: async () => true,
       publisher: publisher as never,
       reviewGateway: reviewGateway as never,
       now: () => "2026-10-15T00:00:00.000Z",

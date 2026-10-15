@@ -74,7 +74,7 @@
         </div>
 
         <section class="architecture-section" data-testid="production-foundation-status" aria-labelledby="foundation-status-title">
-          <div class="architecture-section-heading"><p class="step-label">仓库真实进度</p><h3 id="foundation-status-title">PostgreSQL 政策持久化、Redis 缓存、Outbox 与 Worker 已实现</h3><p>Worker 已纳入 Compose：服务版包含真实 PostgreSQL、Redis 与常驻 Worker，可复跑“发布 v1 → 缓存 → 发布 v2 → Worker 消费 → API 切换 → 缓存与审计”的证据链。</p></div>
+          <div class="architecture-section-heading"><p class="step-label">仓库真实进度</p><h3 id="foundation-status-title">PostgreSQL 政策持久化、Redis 缓存、Outbox 与 Worker 已实现</h3><p>Worker 已纳入 Compose：服务版包含真实 PostgreSQL、Redis 与常驻 Worker，可复跑“发布 v1 → 缓存 → 发布 v2 → Worker 消费 → API 切换 → 缓存与审计”的证据链；重复提交同一验收版本会幂等跳过。</p></div>
           <div class="delivery-grid">
             <article class="architecture-card"><p class="card-kicker">已实现 · 发布生效</p><h4>已发布政策与计算证据</h4><ol class="flow-list"><li><strong>版本化持久化</strong><span>已发布政策、审核记录、计算审计均写入 PostgreSQL；计算响应携带政策版本和缓存状态。</span></li><li><strong>Worker 消费 Outbox</strong><span>常驻 Worker 在发布后失效旧版本 Redis 键并预热新版本；验收脚本证明 API 已切换。</span></li></ol></article>
             <article class="architecture-card online-flow"><p class="card-kicker">后续替换 · 离线生产</p><h4>真实政策来源与 AI 草稿尚未实现</h4><ol class="flow-list"><li><strong>当前边界</strong><span>仓库只含城市 A / B 的可审阅示例种子；不抓取政府站点，也不接入 OCR 或模型服务。</span></li><li><strong>下一阶段</strong><span>以受控来源连接器、附件留档、证据定位、人工审核工作台替换演示输入；AI 仍无发布与金额决策权。</span></li></ol></article>

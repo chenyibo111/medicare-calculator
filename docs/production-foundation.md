@@ -18,6 +18,8 @@ POST /api/v1/reimbursement-calculations
 
 政策发布通过一个 PostgreSQL 事务更新旧版本状态、写入新版本和 `policy.published` Outbox 事件。Worker 以安全领取方式消费事件，删除旧版本缓存键并预热新版本当天键；重复事件不会恢复旧缓存。
 
+评测发布 CLI 也以 `地区 + 险种 + 版本` 作为幂等键：同一验收版本已入库后，即使状态已经因后续版本变为 `superseded`，再次执行仍只返回 `already_published`，不会再次发布或产生新的 Outbox 事件。
+
 ## 可复跑验收
 
 `pnpm run verify:compose` 会：

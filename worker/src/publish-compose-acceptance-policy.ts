@@ -6,6 +6,7 @@ import { LocalReviewGateway } from "../../packages/infrastructure/src/local-revi
 import { PostgresPolicyPublicationStore } from "../../packages/infrastructure/src/postgres/postgres-policy-publication-store.js";
 import { createPostgresSqlExecutor, type PostgresSqlExecutor } from "../../packages/infrastructure/src/postgres/client.js";
 import {
+  COMPOSE_ACCEPTANCE_BENEFIT_PLAN,
   COMPOSE_ACCEPTANCE_REGION,
   type ComposeAcceptancePolicyVersion,
   composeAcceptancePolicy,
@@ -15,13 +16,13 @@ type AcceptancePublisher = Pick<PolicyPublisher, "publish">;
 
 export async function publishComposeAcceptancePolicy(dependencies: {
   readonly version: ComposeAcceptancePolicyVersion;
-  readonly hasPublishedVersion: (version: string) => Promise<boolean>;
+  readonly hasPersistedVersion: (version: string) => Promise<boolean>;
   readonly publisher: AcceptancePublisher;
   readonly reviewGateway: PolicyReviewGateway;
   readonly now?: () => string;
 }): Promise<{ version: string; created: boolean }> {
   const policy = composeAcceptancePolicy(dependencies.version);
-  if (await dependencies.hasPublishedVersion(policy.version)) {
+  if (await dependencies.hasPersistedVersion(policy.version)) {
     return { version: policy.version, created: false };
   }
 
@@ -41,13 +42,16 @@ export async function publishComposeAcceptancePolicy(dependencies: {
   return { version: policy.version, created: true };
 }
 
-async function hasPublishedVersion(database: PostgresSqlExecutor, version: string): Promise<boolean> {
+export async function hasPersistedComposeAcceptancePolicyVersion(
+  database: PostgresSqlExecutor,
+  version: string,
+): Promise<boolean> {
   const result = await database.query(
     `SELECT EXISTS (
       SELECT 1 FROM policy_versions
-      WHERE region = $1 AND version = $2 AND status = 'published'
+      WHERE region = $1 AND benefit_plan = $2 AND version = $3
     ) AS exists`,
-    [COMPOSE_ACCEPTANCE_REGION, version],
+    [COMPOSE_ACCEPTANCE_REGION, COMPOSE_ACCEPTANCE_BENEFIT_PLAN, version],
   );
   return result.rows[0]?.exists === true;
 }
@@ -66,7 +70,7 @@ export async function runComposeAcceptancePublisher(args: readonly string[] = pr
   try {
     const result = await publishComposeAcceptancePolicy({
       version: requestedVersion(args),
-      hasPublishedVersion: (version) => hasPublishedVersion(database, version),
+      hasPersistedVersion: (version) => hasPersistedComposeAcceptancePolicyVersion(database, version),
       reviewGateway,
       publisher: new PolicyPublisher({
         store: new PostgresPolicyPublicationStore(database),
