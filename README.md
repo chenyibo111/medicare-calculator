@@ -54,6 +54,8 @@ docker compose --env-file .env exec -T policy-worker pnpm run compose:publish-ac
 
 同一验收版本可安全重复执行：若该地区、险种与版本已入库（即使后来已被 v2 替代），命令会返回 `already_published`，不会重复写入政策、审核记录或 Outbox 事件。
 
+要在页面直接演示版本切换：依次发布 v1 或 v2 后，打开 `http://localhost:3010`，点击“填入 Compose 验收样例”再开始测算；结算单的“政策版本”将显示 `compose-e2e-v1` 或 `compose-e2e-v2`。该按钮只填入固定测算条件，不提供浏览器端发布能力。
+
 ### 4. 政策处理演示
 
 ```powershell

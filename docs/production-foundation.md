@@ -20,6 +20,8 @@ POST /api/v1/reimbursement-calculations
 
 评测发布 CLI 也以 `地区 + 险种 + 版本` 作为幂等键：同一验收版本已入库后，即使状态已经因后续版本变为 `superseded`，再次执行仍只返回 `already_published`，不会再次发布或产生新的 Outbox 事件。
 
+服务版为评测保留“Compose 验收样例”快捷填充。它与 Worker 验收政策使用同一组测算条件；在 CLI 发布 v1 或 v2 后，页面只通过测算 API 显示该次结果实际命中的 `compose-e2e-v1` 或 `compose-e2e-v2`。快捷填充不具备发布权限。
+
 ## 可复跑验收
 
 `pnpm run verify:compose` 会：

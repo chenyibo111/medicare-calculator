@@ -66,6 +66,39 @@ test.describe("服务版 @service", () => {
     await expect(page.getByText("服务器计算")).toBeVisible();
   });
 
+  test("Compose 验收样例提交固定验收输入并展示服务端返回的政策版本", async ({ page }) => {
+    await page.goto("http://127.0.0.1:3011");
+    await page.route("**/api/v1/reimbursement-calculations", (route) => route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        calculationId: "compose-acceptance-calculation",
+        policyVersion: "compose-e2e-v2",
+        cacheStatus: "miss",
+        result: { estimatedSelfPayFen: 726_000, basicReimbursementFen: 1_274_000, catastrophicReimbursementFen: 0 },
+        trace: [],
+      }),
+    }));
+    const calculationRequest = page.waitForRequest((request) => request.url().endsWith("/api/v1/reimbursement-calculations") && request.method() === "POST");
+
+    await page.getByTestId("service-sample-compose").click();
+    await expect(page.getByLabel("参保城市")).toHaveValue("Compose验收市");
+    await page.getByRole("button", { name: "开始测算" }).click();
+
+    expect(await (await calculationRequest).postDataJSON()).toMatchObject({
+      region: "Compose验收市",
+      employmentStatus: "resident",
+      hospitalLevel: "tertiary",
+      totalAmountFen: 2_000_000,
+      outOfCatalogAmountFen: 100_000,
+      classBAmountFen: 200_000,
+      annualReimbursedAmountFen: 0,
+      outOfAreaFiled: true,
+    });
+    await expect(page.getByText("compose-e2e-v2", { exact: true })).toBeVisible();
+    await expect(page.getByTestId("service-estimated-self-pay")).toHaveText("¥7,260.00");
+  });
+
   test("API 错误时保留输入并给出可恢复提示", async ({ page }) => {
     await page.goto("http://127.0.0.1:3011");
     await page.getByTestId("service-sample-city-b").click();
