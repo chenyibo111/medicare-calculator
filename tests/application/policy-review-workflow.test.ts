@@ -28,6 +28,19 @@ const policy: PublishedPolicy = {
 
 const author: OperatorIdentity = { id: "author-1", displayName: "政策录入员", roles: ["policy_author"] };
 const reviewer: OperatorIdentity = { id: "reviewer-1", displayName: "政策审核员", roles: ["policy_reviewer"] };
+const staticDraftCandidate = {
+  source: {
+    sourceId: "source-1",
+    region: policy.region,
+    sourceUrl: "https://example.test/compose",
+    capturedAt: "2026-10-15T00:00:00.000Z",
+    artifact: { fileName: "compose-template.json", format: "json" as const, sha256: "b".repeat(64), byteLength: 512 },
+  },
+  policy,
+  evidence: [],
+  extraction: { method: "demo_static" as const, adapterVersion: "1.0.0", aiAssisted: false },
+  demoAIProposal: true as const,
+};
 
 class InMemoryPolicyReviewStore implements PolicyReviewStore {
   readonly drafts = new Map<string, PolicyReviewDraft>();
@@ -37,9 +50,10 @@ class InMemoryPolicyReviewStore implements PolicyReviewStore {
     const draft: PolicyReviewDraft = {
       id: input.id,
       status: "draft",
-      demoAIProposal: true,
       source: input.source,
       policy: input.policy,
+      evidence: input.evidence,
+      extraction: input.extraction,
       submittedBy: null,
       submittedAt: null,
       review: null,
@@ -77,12 +91,45 @@ class InMemoryPolicyReviewStore implements PolicyReviewStore {
 }
 
 describe("PolicyReviewWorkflow", () => {
+  it("将受控导入的来源工件、确定性提取方式与字段证据保留在草稿中", async () => {
+    const store = new InMemoryPolicyReviewStore();
+    const workflow = new PolicyReviewWorkflow({ store, now: () => "2026-10-15T00:00:00.000Z", createId: () => "draft-import-1" });
+    const imported = {
+      source: {
+        sourceId: "source-import-1",
+        region: policy.region,
+        sourceUrl: "https://example.test/compose/import-v1",
+        capturedAt: "2026-10-15T00:00:00.000Z",
+        artifact: { fileName: "compose-import-v1.json", format: "json", sha256: "a".repeat(64), byteLength: 2048 },
+        rawDocument: "{\"document\":\"not returned to the review store\"}",
+      },
+      policy,
+      extraction: { method: "deterministic_json", adapterVersion: "1.0.0", aiAssisted: false },
+      evidence: [{ field: "policy.version", locator: "$.policy.version", excerpt: policy.version, sourceSha256: "a".repeat(64) }],
+    };
+
+    const draft = await (workflow as unknown as { createDraft(operator: OperatorIdentity, candidate: typeof imported): Promise<PolicyReviewDraft> }).createDraft(author, imported);
+
+    expect(draft).toMatchObject({
+      id: "draft-import-1",
+      status: "draft",
+      source: {
+        sourceId: "source-import-1",
+        capturedAt: "2026-10-15T00:00:00.000Z",
+        artifact: { fileName: "compose-import-v1.json", sha256: "a".repeat(64) },
+      },
+      extraction: { method: "deterministic_json", aiAssisted: false },
+      evidence: [{ field: "policy.version", locator: "$.policy.version" }],
+    });
+    expect(JSON.stringify(draft)).not.toContain("not returned to the review store");
+  });
+
   it("只允许政策录入员创建并提交草稿，审核员不能审核自己提交的草稿", async () => {
     const store = new InMemoryPolicyReviewStore();
     const workflow = new PolicyReviewWorkflow({ store, now: () => "2026-10-15T00:00:00.000Z", createId: () => "draft-1" });
 
-    await expect(workflow.createDraft(reviewer, { sourceId: "source-1", region: policy.region, sourceUrl: "https://example.test/compose" }, policy)).rejects.toThrow("没有政策录入权限");
-    await workflow.createDraft(author, { sourceId: "source-1", region: policy.region, sourceUrl: "https://example.test/compose" }, policy);
+    await expect(workflow.createDraft(reviewer, staticDraftCandidate)).rejects.toThrow("没有政策录入权限");
+    await workflow.createDraft(author, staticDraftCandidate);
     await workflow.submitDraft(author, "draft-1");
 
     await expect(workflow.decideDraft({ ...author, roles: ["policy_author", "policy_reviewer"] }, "draft-1", "approved", "规则字段完整")).rejects.toThrow("不能审核自己提交的草稿");
@@ -107,7 +154,7 @@ describe("PolicyReviewWorkflow", () => {
       createId: () => "draft-2",
     });
 
-    await workflow.createDraft(author, { sourceId: "source-2", region: policy.region, sourceUrl: "https://example.test/compose" }, policy);
+    await workflow.createDraft(author, { ...staticDraftCandidate, source: { ...staticDraftCandidate.source, sourceId: "source-2" } });
     await workflow.submitDraft(author, "draft-2");
     await workflow.decideDraft(reviewer, "draft-2", "approved", "验收通过");
     const result = await workflow.publishDraft(reviewer, "draft-2");

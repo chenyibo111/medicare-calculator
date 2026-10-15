@@ -7,12 +7,48 @@ export interface RawPolicySource {
   readonly proposedPolicy: PublishedPolicy;
 }
 
-export interface PendingPolicyDraft {
+export interface SourceArtifact {
+  readonly fileName: string;
+  readonly format: "json";
+  readonly sha256: string;
+  readonly byteLength: number;
+}
+
+export interface CapturedPolicySource {
+  readonly sourceId: string;
+  readonly region: string;
+  readonly sourceUrl: string;
+  readonly capturedAt: string;
+  readonly artifact: SourceArtifact;
+  readonly rawDocument: string;
+}
+
+export type PolicyDraftSource = Omit<CapturedPolicySource, "rawDocument">;
+
+export interface PolicyEvidence {
+  readonly field: string;
+  readonly locator: string;
+  readonly excerpt: string;
+  readonly sourceSha256: string;
+}
+
+export interface PolicyExtractionMetadata {
+  readonly method: "demo_static" | "deterministic_json" | "ocr_llm";
+  readonly adapterVersion: string;
+  readonly aiAssisted: boolean;
+}
+
+export interface PolicyDraftCandidate {
+  readonly source: PolicyDraftSource;
+  readonly policy: PublishedPolicy;
+  readonly evidence: readonly PolicyEvidence[];
+  readonly extraction: PolicyExtractionMetadata;
+  readonly demoAIProposal?: true;
+}
+
+export interface PendingPolicyDraft extends PolicyDraftCandidate {
   readonly id: string;
   readonly status: "pending_review";
-  readonly demoAIProposal: true;
-  readonly source: Pick<RawPolicySource, "sourceId" | "region" | "sourceUrl">;
-  readonly policy: PublishedPolicy;
 }
 
 export interface ApprovedPolicyDraft extends Omit<PendingPolicyDraft, "status"> {
@@ -27,8 +63,8 @@ export interface PublishedPolicyDraft extends Omit<ApprovedPolicyDraft, "status"
   readonly publishedAt: string;
 }
 
-export interface PolicySourceConnector { fetch(sourceConfig: string): Promise<RawPolicySource>; }
-export interface PolicyExtractionAdapter { propose(rawSource: RawPolicySource): Promise<PendingPolicyDraft>; }
+export interface PolicySourceConnector { fetch(sourceConfig: string): Promise<CapturedPolicySource>; }
+export interface PolicyExtractionAdapter { propose(rawSource: CapturedPolicySource): Promise<PendingPolicyDraft>; }
 export interface PolicyReviewGateway {
   approve(draft: PendingPolicyDraft, reviewer: string): Promise<ApprovedPolicyDraft>;
   verifyApproved(draft: ApprovedPolicyDraft): Promise<void>;

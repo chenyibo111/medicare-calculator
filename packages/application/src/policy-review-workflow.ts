@@ -1,11 +1,11 @@
 import { randomUUID } from "node:crypto";
-import type { PublishedPolicy } from "../../domain/src/policy.js";
 import type {
   ApprovedPolicyDraft,
   PendingPolicyDraft,
+  PolicyDraftCandidate,
+  PolicyDraftSource,
   PolicyPublisher,
   PublishedPolicyDraft,
-  RawPolicySource,
 } from "./publish-policy.js";
 
 export type PolicyOperatorRole = "policy_author" | "policy_reviewer";
@@ -40,8 +40,11 @@ export interface PolicyReviewDraft extends Omit<PendingPolicyDraft, "status"> {
 export interface PolicyReviewStore {
   createDraft(input: {
     readonly id: string;
-    readonly source: Pick<RawPolicySource, "sourceId" | "region" | "sourceUrl">;
-    readonly policy: PublishedPolicy;
+    readonly source: PolicyDraftSource;
+    readonly policy: PolicyDraftCandidate["policy"];
+    readonly evidence: PolicyDraftCandidate["evidence"];
+    readonly extraction: PolicyDraftCandidate["extraction"];
+    readonly demoAIProposal?: true;
     readonly createdAt: string;
   }): Promise<PolicyReviewDraft>;
   getDraft(draftId: string): Promise<PolicyReviewDraft | null>;
@@ -61,6 +64,11 @@ function hasRole(operator: OperatorIdentity, role: PolicyOperatorRole): boolean 
   return operator.roles.includes(role);
 }
 
+function sourceForReview(source: PolicyDraftCandidate["source"]): PolicyDraftSource {
+  const { rawDocument: _rawDocument, ...reviewSource } = source as PolicyDraftCandidate["source"] & { rawDocument?: unknown };
+  return reviewSource;
+}
+
 export class PolicyReviewWorkflow {
   constructor(
     private readonly dependencies: {
@@ -73,15 +81,17 @@ export class PolicyReviewWorkflow {
 
   async createDraft(
     operator: OperatorIdentity,
-    source: Pick<RawPolicySource, "sourceId" | "region" | "sourceUrl">,
-    policy: PublishedPolicy,
+    candidate: PolicyDraftCandidate,
   ): Promise<PolicyReviewDraft> {
     this.requireRole(operator, "policy_author", "没有政策录入权限");
-    if (source.region !== policy.region) throw new Error("政策来源地区与政策规则地区不一致");
+    if (candidate.source.region !== candidate.policy.region) throw new Error("政策来源地区与政策规则地区不一致");
     return this.dependencies.store.createDraft({
       id: (this.dependencies.createId ?? randomUUID)(),
-      source,
-      policy,
+      source: sourceForReview(candidate.source),
+      policy: candidate.policy,
+      evidence: candidate.evidence,
+      extraction: candidate.extraction,
+      demoAIProposal: candidate.demoAIProposal,
       createdAt: this.now(),
     });
   }
